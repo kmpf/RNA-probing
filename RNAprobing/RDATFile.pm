@@ -262,7 +262,7 @@ sub mutpos {
 
 sub serialize_mutpos{
     my $self = shift;
-    my $line = "MUTPOS ".join( " ", @{ $self->mutpos() } )."\n" );
+    my $line = "MUTPOS ".join( " ", @{ $self->mutpos() } )."\n";
     return $line;
 }
 
@@ -295,7 +295,7 @@ sub serialize_comment{
 }
 
 sub annotation_data {
-    my ($self, $annotaion_data) = @_;
+    my ($self, $annotation_data) = @_;
     if ( defined $annotation_data){
         $self->{"ANNOTATION_DATA"} = $annotation_data;
     }
@@ -363,7 +363,7 @@ sub _href_to_string{
     my ($self, $href) = @_;
     my $line = "";
     foreach my $key ( keys( %{ $href } ) ) {
-        $line = " ".$key.":".$href->{$key});
+        $line = " ".$key.":".$href->{$key};
     }
     return $line;
 }

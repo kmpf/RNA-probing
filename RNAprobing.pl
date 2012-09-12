@@ -1,10 +1,29 @@
-#!/usr/bin/env perl
+#!/usr/bin/env perl 
+#===============================================================================
+#
+#         FILE: RNAprobing.pl
+#
+#        USAGE: ./RNAprobing.pl  
+#
+#  DESCRIPTION: 
+#
+#      OPTIONS: ---
+# REQUIREMENTS: ---
+#         BUGS: ---
+#        NOTES: ---
+#       AUTHOR: Christoph Kaempf (CK), kaempf@bioinf.uni-leipzig.de
+# ORGANIZATION: 
+#      VERSION: 1.0
+#      CREATED: 05.08.2012 15:29:50
+#     REVISION: ---
+#===============================================================================
 
-## Loading modules and initializing variables ##
 use strict;
 use warnings;
+use utf8;
+
 use feature "switch";
-use lib "/home/hubert/bin/scripts";
+use lib "/home/hubert/bin/RNAprobing";
 require ProbingRNA::RDATFile;
 require ProbingRNA::OFFFile;
 require ProbingRNA::BLASTresult;
@@ -49,7 +68,6 @@ GetOptions(
 #                 
 ###############################################################################
 
-# get the configuration file for the logger
 my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
@@ -58,6 +76,7 @@ Log::Log4perl->init("$log4perl_conf");
 # Get the logger
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
+$logger->info("++++ ".__FILE__." has been started. ++++");
 
 ###############################################################################
 #                 

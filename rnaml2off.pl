@@ -1,4 +1,22 @@
 #!/usr/bin/env perl
+#===============================================================================
+#
+#         FILE: rnaml2off.pl
+#
+#        USAGE: ./rnaml2off.pl  
+#
+#  DESCRIPTION: 
+#
+#      OPTIONS: ---
+# REQUIREMENTS: ---
+#         BUGS: ---
+#        NOTES: ---
+#       AUTHOR: Christoph Kaempf (CK), kaempf@bioinf.uni-leipzig.de
+# ORGANIZATION: 
+#      VERSION: 1.0
+#      CREATED: 05.08.2012 15:28:44
+#     REVISION: ---
+#===============================================================================
 
 ## Loading modules and initializing variables ##
 use strict;
@@ -28,14 +46,21 @@ GetOptions(
     "help|h" => \$help,
     "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
 
-# Configuration file for the logger
-my $log4perl_conf = file(dirname(__FILE__), "rnaml2off.log.conf");
+###############################################################################
+#                 
+# Logger initiation  
+#                 
+###############################################################################
+
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
 
 # Get the logger
-my $logger = &configureLogger($verbose);
+my $logger_name = "RNAprobing";
+my $logger = &configureLogger($verbose, $logger_name);
+$logger->info("++++ ".__FILE__." has been started. ++++");
 
 pod2usage(-verbose => 1) && exit if ( $help );
 pod2usage(-verbose => 1) && exit if ( !$filelist );

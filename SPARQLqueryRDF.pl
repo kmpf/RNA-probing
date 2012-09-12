@@ -1,14 +1,27 @@
 #!/usr/bin/env perl
+#===============================================================================
+#
+#         FILE: SPARQLqueryRDF.pl
+#
+#        USAGE: ./SPARQLqueryRDF.pl  
+#
+#  DESCRIPTION: 
+#
+#      OPTIONS: ---
+# REQUIREMENTS: ---
+#         BUGS: ---
+#        NOTES: ---
+#       AUTHOR: Christoph Kaempf (CK), kaempf@bioinf.uni-leipzig.de
+# ORGANIZATION: 
+#      VERSION: 1.0
+#      CREATED: 05.08.2012 15:29:50
+#     REVISION: ---
+#===============================================================================
 
 ## Loading modules and initializing variables ##
 use strict;
 use warnings;
 use feature "switch";
-use lib "/home/hubert/bin/scripts";
-require ProbingRNA::RDATFile;
-require ProbingRNA::OFFFile;
-require ProbingRNA::BLASTresult;
-require ProbingRNA::RNAupFile;
 use Data::Dumper;
 use File::Basename;
 use Getopt::Long;
@@ -21,6 +34,15 @@ use RDF::Query;
 use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
+# load my modules
+my $module_dir = dirname(__FILE__);
+$module_dir =~ s/scripts$/RNAprobing/g;
+push(@INC, $module_dir);
+require ProbingRNA::RDATFile;
+require ProbingRNA::OFFFile;
+require ProbingRNA::BLASTresult;
+require ProbingRNA::RNAupFile;
+
 
 my $rdf_file = "";
 my $sparql_file = "";
@@ -28,6 +50,23 @@ my $sparql_file = "";
 GetOptions(
     "rdf=s" => \$rdf_file,
     "sparql=s" => \$sparql_file);
+
+###############################################################################
+#                 
+# Logger initiation  
+#                 
+###############################################################################
+
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
+
+# Apply configuration to the logger
+Log::Log4perl->init("$log4perl_conf");
+
+# Get the logger
+my $logger_name = "RNAprobing";
+my $logger = &configureLogger($verbose, $logger_name);
+$logger->info("++++ ".__FILE__." has been started. ++++");
+
 
 
     # Configure RDF::Helper
@@ -76,4 +115,46 @@ if ( $sparql_query =~ /[Cc][Oo][Nn][Ss][Tt][Rr][Uu][Cc][Tt]\s/ ) {
       print $st->as_string;
     } 
 }
+
+__END__
+
+
+=head1 NAME
+
+SPARQLqueryRDF.pl - Querys a RDF model
+
+=head1 SYNOPSIS
+
+SPARQLqueryRDF.pl -f=</path/to/file> -v -v -v -t
+
+
+=head1 OPTIONS
+
+=over 4
+
+=item -f, --file=</path/to/file>
+
+RDAT file(s) to be converted to FASTA files
+
+=item -t, --toDNA
+
+if set convert RNA sequences are converted into DNA sequences
+
+=item -v, --verbose
+
+verbosity level increases by multiple times option given
+
+=item -h, --help
+
+prints this help page
+
+=back
+
+
+=back
+=head1 DESCRIPTION
+B<This program> will read the given input file(s) and do something
+useful with the contents thereof.
+
+=cut
 

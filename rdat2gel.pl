@@ -1,11 +1,30 @@
-#!/usr/bin/env perl
+#!/usr/bin/env perl 
+#===============================================================================
+#
+#         FILE: rdat2gel.pl
+#
+#        USAGE: ./rdat2gel.pl  
+#
+#  DESCRIPTION: 
+#
+#      OPTIONS: ---
+# REQUIREMENTS: ---
+#         BUGS: ---
+#        NOTES: ---
+#       AUTHOR: Christoph Kaempf (CK), kaempf@bioinf.uni-leipzig.de
+# ORGANIZATION: 
+#      VERSION: 1.0
+#      CREATED: 05.08.2012 15:26:53
+#     REVISION: ---
+#===============================================================================
 
 ## Loading modules and initializing variables ##
 use strict;
 use warnings;
+use utf8;
 use feature "switch";
-use lib "/homes/olymp/christoph.kaempf/bin/scripts";
-require ProbingRNA::RDATFile;
+use lib "/homes/hubert/bin/RNAprobing";
+require RNA::RDATFile;
 use Data::Dumper;
 use File::Basename;
 use Getopt::Long;
@@ -32,14 +51,22 @@ GetOptions(
     "output-format|o=s" => \$output_format,
     "labeled-end|l=s" => \$labeled_end);
 
-# Configuration file for the logger
-my $log4perl_conf = file(dirname(__FILE__), "rdat2gel.log.conf");
+###############################################################################
+#                 
+# Logger initiation  
+#                 
+###############################################################################
+
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
 
 # Get the logger
-my $logger = &configureLogger($verbose, "rdat2gel");
+my $logger_name = "RNAprobing";
+my $logger = &configureLogger($verbose, $logger_name);
+$logger->info("++++ ".__FILE__." has been started. ++++");
+
 
 my @rdat_files = &checkFiles(@files);
 # my @gel_files = ();

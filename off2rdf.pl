@@ -1,14 +1,32 @@
 #!/usr/bin/env perl
+#===============================================================================
+#
+#         FILE: off2rdf.pl
+#
+#        USAGE: ./off2rdf.pl  
+#
+#  DESCRIPTION: 
+#
+#      OPTIONS: ---
+# REQUIREMENTS: ---
+#         BUGS: ---
+#        NOTES: ---
+#       AUTHOR: Christoph Kaempf (CK), kaempf@bioinf.uni-leipzig.de
+# ORGANIZATION: 
+#      VERSION: 1.0
+#      CREATED: 05.08.2012 15:28:44
+#     REVISION: ---
+#===============================================================================
 
 ## Loading modules and initializing variables ##
 use strict;
 use warnings;
 use feature "switch";
-use lib "/home/hubert/bin/scripts";
-require ProbingRNA::RDATFile;
-require ProbingRNA::OFFFile;
-require ProbingRNA::BLASTresult;
-require ProbingRNA::RNAupFile;
+use lib "/home/hubert/bin/RNAprobing";
+require RNAprobing::RDATFile;
+require RNAprobing::OFFFile;
+require RNAprobing::BLASTresult;
+require RNAprobing::RNAupFile;
 use Data::Dumper;
 use File::Basename;
 use Getopt::Long;
@@ -39,7 +57,6 @@ GetOptions(
 #                 
 ###############################################################################
 
-# get the configuration file for the logger
 my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
@@ -48,6 +65,7 @@ Log::Log4perl->init("$log4perl_conf");
 # Get the logger
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
+$logger->info("++++ ".__FILE__." has been started. ++++");
 
 ###############################################################################
 #                 
@@ -58,7 +76,7 @@ my $logger = &configureLogger($verbose, $logger_name);
 $off_file = &checkFiles($off_file);
 
 # creation of OFF file object and information extraction
-my $off_object      = ProbingRNA::OFFFile->new($off_file);
+my $off_object      = RNAprobing::OFFFile->new($off_file);
 my @off_seq         = split(//, $off_object->sequence());
 
 ###############################################################################
