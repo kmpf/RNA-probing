@@ -44,22 +44,51 @@ GetOptions(
 	"file|f=s"  => \$file,
 	"verbose|v+" => \$verbose);
 
+###############################################################################
+#                 
+# Logger initiation  
+#                 
+###############################################################################
+
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
+
+# Apply configuration to the logger
+Log::Log4perl->init("$log4perl_conf");
+
+# Get the logger
+my $logger_name = "RNAprobing";
+my $logger = &configureLogger($verbose, $logger_name);
+$logger->info("++++ ".__FILE__." has been started. ++++");
+
+
+
+
+
 my $base_url = "http://ndbserver.rutgers.edu/atlas/";
 my $nmr = "nmr/structures/";
 my $xray = "xray/structures/";
 
 mkdir("./RNAML_files_from_NDB");
 
-open(my $ndb_entries_file, ">", $file) or die("Can't open $file.");
+open(my $ndb_entries_file, "<", $file) or die("Can't open $file.");
 while ( <$ndb_entries_file> ) {
-    next if ( $_ =~ /ID/ );
+    next if ( $_ =~ /^ID/ );
     $_ =~ /^(\w{4,})/; 
     my $ndb_id = $1;
     my $nmr_url = $base_url . $nmr . "id/". lc($ndb_id) . "/" . uc($ndb_id) . "-rna1.xml";
     my @ndb_id_split = split('', uc($ndb_id) );
     my $xray_url = $base_url . $xray . $ndb_id_split[0] ."/". lc($ndb_id) . "/" . uc($ndb_id) . "-rna1.xml";
     $file = "./RNAML_files_from_NDB/".uc($ndb_id)."-rna1.xml";
-    getstore($nmr_url, $file); # try downloading as if it is a NMR structure
-    getstore($xray_url, $file); # try downloading as if it is a Xray structure
+    # try downloading as if it is a NMR structure
+    if ( getstore($nmr_url, $file) == 200 ) {
+        ;
+        next;    
+    }
+    # try downloading as if it is a Xray structure
+    if ( getstore($xray_url, $file) == 200 ) {
+        next;
+    } 
 }
+
+close( $ndb_entries_file );
 

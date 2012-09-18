@@ -25,6 +25,7 @@ use XML::Simple;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
+use File::Find;
 use Log::Log4perl qw(get_logger :levels);
 use Pod::Usage;
 use Path::Class;
@@ -32,27 +33,33 @@ use Path::Class;
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");
 my $dumper = 0;
-my $filelist = '';
 my $nota = 'LW';
 my $help = '';
 my $man = 0;
 my $verbose = 0;
 my @files = ();
+my @directories = ();
 GetOptions(
     "dumper" => \$dumper,
-    "file|f=s" => \$filelist,
+    "file|f=s" => \@files,
+    "directory|d=s" => \@directories,
     "notation|n:s" => \$nota,
     "verbose|v+" => \$verbose,
     "help|h" => \$help,
     "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
+
+# allow coma seperated values as input
+@files = split(/,/,join(',',@files));
+@directories = split(/,/,join(',',@directories));
 
 ###############################################################################
 #                 
 # Logger initiation  
 #                 
 ###############################################################################
-
-my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
+my $this_file = __FILE__;
+$this_file =~ s/scripts/RNAprobing/g;
+my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
@@ -60,26 +67,42 @@ Log::Log4perl->init("$log4perl_conf");
 # Get the logger
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
-$logger->info("++++ ".__FILE__." has been started. ++++");
+$logger->info("++++ ".$this_file." has been started. ++++");
 
 pod2usage(-verbose => 1) && exit if ( $help );
-pod2usage(-verbose => 1) && exit if ( !$filelist );
+pod2usage(-verbose => 1) && exit if ( scalar(@files) == 0 && scalar(@directories) == 0 );
 pod2usage(-verbose => 2) && exit if ( $man );
 
+my @rnamlFiles = ();
 
+## Lookup @files and @directories for rna1.xml files and insert the found in @rnamlFiles
+##  - find all rna1.xml files in the @directories given and add them to @files
+foreach (@directories) {
+    if ( -d $_ ) {
+        $logger->info("$_ is a directory");
+        $logger->info("Looking for rna1.xml files in $_");
 
-if ($filelist){
-    $filelist =~ s/^\s+//;
-    $logger->debug($filelist);
-    @files = split(/\s+/,$filelist);
-    $logger->debug(Dumper(@files));
-} else {
-    exit;
+        $logger->info( find(\&wanted, $_) );
+    } else {
+        $logger->info("$_ isn't a directory");
+    }
 }
 
-
-
-
+foreach (@files) {
+    $logger->info("Perform file checks for file $_");
+    if ( -f $_){
+        $logger->info("$_ is a plain file");
+        if ( -r $_) {
+            $logger->info("$_ can be accessed");
+            push(@rnamlFiles, $_);
+        } else {
+            $logger->error("Can not access $_");
+        }
+    } else {
+        $logger->error("$_ is not a plain file");
+        $logger->error("$_ is a directory") if ( -d $_);
+    }
+}
 
 ## Check for correct notation selection ##
 my $notation = "";
@@ -101,25 +124,6 @@ if ($nota eq "LG" ) {
 }
 else {
     $notation = "LW";
-}
-
-# Check if files are readable
-my @rnamlFiles = ();
-foreach (@files){
-    $logger->info("Perform file checks for file $_");
-    if ( -f $_){
-        $logger->info("$_ is a plain file");
-        if ( -r $_) {
-            $logger->info("$_ can be accessed");
-            push(@rnamlFiles, $_);
-        } else {
-            $logger->error("Can not access $_");
-        }
-
-    } else {
-        $logger->error("$_ is not a plain file");
-        $logger->error("$_ is a directory") if ( -d $_);
-    }
 }
 
 ###############################################################
@@ -147,7 +151,7 @@ foreach my $rnaml_file ( @rnamlFiles ){
         my $off_file = "$ndb_id.$key.off";
 
         ## try to open the file $off_file
-        open(OURFILE, ">$off_file") or die("Can't open $off_file.");
+        open(my $off_out_file, ">", $off_file) or die("Can't open $off_file.");
         $logger->debug("Create output file $off_file.");
 
         ## try to open the file $fasta_file
@@ -155,14 +159,14 @@ foreach my $rnaml_file ( @rnamlFiles ){
         $logger->debug("Create output file $fasta_file.");
 
         ## $ndb_id - holds the id of the molecule
-        print OURFILE "> $ndb_id.$key\n";
+        print $off_out_file  "> $ndb_id.$key\n" ;
         print FASTAFILE "> $ndb_id.$key\n";
         $logger->debug("Header: > $ndb_id");
 
         ## $sequence - holds the RNA sequence
         my $sequence = join("", @{$data->{'molecule'}->{$key}->{'sequence'}[0]->{'seq-data'}});
         $sequence = &trimString($sequence);
-        print OURFILE "$sequence\n";
+        print $off_out_file "$sequence\n";
         print FASTAFILE "$sequence\n";
         $logger->debug("Sequence: $sequence");
         
@@ -170,9 +174,7 @@ foreach my $rnaml_file ( @rnamlFiles ){
         my @dotBracket;
 
         # fill @dotBracket with length($sequence) dots
-        for (my $i  = 0; $i < length($sequence); $i++){
-            $dotBracket[$i] = '.' ;
-        }
+        @dotBracket = split('', '.' x length($sequence) );
         $logger->debug(@dotBracket);
 
         ## $basePairs - is an array reference on an array which contains all information about all base pairs
@@ -207,20 +209,19 @@ foreach my $rnaml_file ( @rnamlFiles ){
             }
             ## $dbString - is the output string of the Dot-Bracket notation
             my $dbLine = join("", @dotBracket);
-            print OURFILE "$dbLine\n";
+            print $off_out_file "$dbLine\n";
             $logger->debug($dbLine);
             
             ## $colSizeLine - assemble the line that holds the column sizes 
-            my $colSizeLine = "# ".length($notation) . ";";
-            $colSizeLine .= join(";", @colSize);
-            print OURFILE "$colSizeLine\n";
+            my $colSizeLine = "# ". length($notation) .";".join(";", @colSize);
+            print( $off_out_file, $colSizeLine."\n" );
             $logger->debug($colSizeLine);
 
             # sort the keys with a specific subroutine
             foreach my $key (@bpStart5p){
                 my $line = "# ".$notation;
                 $line .= &makeColString($bp{$key}, \@colSize);
-                print OURFILE "$line\n";
+                print $off_out_file "$line\n";
                 $logger->debug("$line");
             }
         }
@@ -235,7 +236,7 @@ foreach my $rnaml_file ( @rnamlFiles ){
         }
         # clear %bp or the next
         %bp = ();
-        close(OURFILE);
+        close($off_out_file);
         close(FASTAFILE);
     }
 }
@@ -247,9 +248,28 @@ foreach my $rnaml_file ( @rnamlFiles ){
 ##
 ###############################################################
 
+###############################################################################
+##              
+##  Invocation - \&wanted
+##      - Subroutine used by File::Find
+##
+###############################################################################
+
+sub wanted {
+    my $logger = get_logger("RNAprobing");
+    my $file = $_;
+    if ( $_ =~ /rna1\.xml$/ ) {
+        $logger->info("$_ is a rna1.xml file");
+        # @files is a global variable
+        push(@files, $File::Find::name);
+    } else {
+        $logger->info("$_ is not a rna1.xml file");
+    }
+}
+
 ###############################################################
 #
-# &configureLogger($verbosityLevel)
+# Invocation - &configureLogger($verbosityLevel)
 # - Configures and initialzes the Logger
 # - $verbosityLevel = scalar value that sets log level
 # -- 0 => $WARN
@@ -261,7 +281,7 @@ foreach my $rnaml_file ( @rnamlFiles ){
 sub configureLogger{
     ## Configure the logger ##
     my $verbose = shift;
-    my $logger = get_logger("rnaml2off");
+    my $logger = get_logger("RNAprobing");
     $logger->info("Verbosity level: $verbose");
     SELECT:{
         if ($verbose == 0){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
@@ -322,16 +342,19 @@ sub insertBrackets{
     if ($edge5P eq 'W' && $edge3P eq 'W'){
         for (my $i = 0; $i < scalar(@{$bracket_stack}); $i++ ) {
             $logger->debug("Bracket type is $i");
+            $logger->debug("Bracket stack contains ".scalar(@{$bracket_stack})." element(s).");
             if ( $pos5P < ${$bracket_stack}[$i] && $pos3P < ${$bracket_stack}[$i] || $pos5P > ${$bracket_stack}[$i] && $pos3P > ${$bracket_stack}[$i] ) {
                 ${$bracket_stack}[$i] = $pos3P;
                 $bracket_type = $i;
+                $logger->debug(${$bracket_stack}[$i]);
                 last;
             } elsif ( $pos5P < ${$bracket_stack}[$i] && $pos3P > ${$bracket_stack}[$i] && $i + 1 == scalar(@{$bracket_stack}) ) {
                 push(@{$bracket_stack}, $pos3P);
-                $bracket_type = $i;
+                $bracket_type = $i + 1;
                 last;
             } elsif ($pos5P < ${$bracket_stack}[$i] && $pos3P > ${$bracket_stack}[$i]) {
                 $logger->info("Detected pseudoknot crossing ".($i + 1)." edges.");
+                $bracket_type = $i + 1;
             } else {
                $logger->error("Encountered a problem with the pseudoknot detection!");
             }
@@ -455,15 +478,15 @@ sub colSizeUpdate{
 sub makeColString{
     my $bpLW = shift;
     my $colSize = shift;
-    my $logger = get_logger();
+    my $logger = get_logger("RNAprobing");
     my $string;
     for (my $i = 0; $i < scalar(@{$colSize}); $i++) { 
         my $diff = $colSize->[$i] - length($bpLW->[$i]);
-        $string = " " x $diff;
+        $string .= " " x $diff;
         $string .= $bpLW->[$i];
     }
-    return $string
-
+    $logger->debug("This is edge: $string");
+    return $string;
 }
 
 ###############################################################
@@ -481,6 +504,8 @@ sub ndb2lw{
     SELECT:{
         # W = Watson-Crick Edge
         if ($_[0] eq '+' || $_[0] eq '-' ){ return "W"; last SELECT; }
+        # E = Watson-Crick Edge involved in non-standard base pair
+        if ($_[0] eq 'W') { return "E"; last SELECT; }
         # N = Non-identified Edge
         if ($_[0] eq '.' || $_[0] eq '?' || $_[0] eq 'X' ){ return "N"; last SELECT; }
         # M = Triplets and higher multiplets
@@ -500,7 +525,7 @@ __END__
 
 =head1 DESCRIPTION
 
- Converts .rnaml files into .off files. The .off files look like normal dot-bracket notation files, but also contain information about Leontis-Westhof style interactions and tertiary interactions between nucleotides.
+ Converts rna1.xml files into .off files. The .off files look like normal dot-bracket notation files, but also contain information about Leontis-Westhof style interactions and tertiary interactions between nucleotides.
 
  Switches that don't define a value can be done in long or short form.
  eg:
