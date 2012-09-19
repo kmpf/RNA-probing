@@ -67,25 +67,32 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 my $base_url = "http://ndbserver.rutgers.edu/atlas/";
 my $nmr = "nmr/structures/";
 my $xray = "xray/structures/";
-
-mkdir("./RNAML_files_from_NDB");
+my $rnaml_ext = "-rna1.xml";
+my $store_directory = "./RNAML_files_from_NDB";
+mkdir($store_directory);
+my $rnaml_files_list = "rnaml_files.list";
 
 open(my $ndb_entries_file, "<", $file) or die("Can't open $file.");
 while ( <$ndb_entries_file> ) {
     next if ( $_ =~ /^ID/ );
     $_ =~ /^(\w{4,})/; 
     my $ndb_id = $1;
-    my $nmr_url = $base_url . $nmr . "id/". lc($ndb_id) . "/" . uc($ndb_id) . "-rna1.xml";
+    my $nmr_url = $base_url . $nmr . "id/". lc($ndb_id) . "/" . uc($ndb_id) . $rnaml_ext;
     my @ndb_id_split = split('', uc($ndb_id) );
-    my $xray_url = $base_url . $xray . $ndb_id_split[0] ."/". lc($ndb_id) . "/" . uc($ndb_id) . "-rna1.xml";
-    $file = "./RNAML_files_from_NDB/".uc($ndb_id)."-rna1.xml";
+    my $xray_url = $base_url . $xray . $ndb_id_split[0] ."/". lc($ndb_id) . "/" . uc($ndb_id) . $rnaml_ext;
+    $file = $store_directory . uc($ndb_id) . "-rna1.xml";
     # try downloading as if it is a NMR structure
     if ( getstore($nmr_url, $file) == 200 ) {
-        ;
+        open (my $list_file, ">>", $rnaml_files_list);
+        print $list_file uc($ndb_id) ."-rna1.xml";
+        close $list_file;
         next;    
     }
     # try downloading as if it is a Xray structure
     if ( getstore($xray_url, $file) == 200 ) {
+        open (my $list_file, ">>", $rnaml_files_list);
+        print $list_file uc($ndb_id) ."-rna1.xml";
+        close $list_file;
         next;
     } 
 }

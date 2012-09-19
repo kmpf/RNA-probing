@@ -26,6 +26,7 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
 use File::Find;
+use File::Spec qw(rel2abs);
 use Log::Log4perl qw(get_logger :levels);
 use Pod::Usage;
 use Path::Class;
@@ -88,13 +89,16 @@ foreach (@directories) {
     }
 }
 
+##  - check found files and add them to @rnamlFiles if they passed the checks
 foreach (@files) {
     $logger->info("Perform file checks for file $_");
     if ( -f $_){
         $logger->info("$_ is a plain file");
         if ( -r $_) {
+            my $abs_path = File::Spec->rel2abs( $_ );
             $logger->info("$_ can be accessed");
-            push(@rnamlFiles, $_);
+            push(@rnamlFiles, $abs_path );
+            $logger->debug("Absolute path: $abs_path");
         } else {
             $logger->error("Can not access $_");
         }
@@ -142,32 +146,52 @@ foreach my $rnaml_file ( @rnamlFiles ){
     my $data = $xml->XMLin($rnaml_file, ForceArray => 1);
 
 
+    my($filename, $directories, $suffix) = fileparse($rnaml_file);
+    ## $off_files_list name of the file that holds a list of all .off files in a certain directory
+    my $off_files_list = $directories ."off_files.list";
+    ## $fasta_files_list name of the file that holds a list of all .fasta files in a certain directory
+    my $fasta_files_list = $directories ."fasta_files.list";
+
     foreach my $key ( keys %{$data->{'molecule'}}){
         ## $off_file = file name for the output file (off = our file format)
-        $rnaml_file =~ s/-rna1.xml$//g;
-        my $ndb_id = $rnaml_file;
+        $filename =~ s/-rna1\.xml$//g;
+        my $ndb_id = $filename;
         $logger->debug("NDB ID of $rnaml_file is $ndb_id.");
+        $logger->debug("Key of actual molecule is $key.");
+
         my $fasta_file = "$ndb_id.$key.fa";
+        $fasta_file =~ s/[^\w\.]//g; # remove any non-word characters (in case of crappy IDs)
         my $off_file = "$ndb_id.$key.off";
+        $off_file =~ s/[^\w\.]//g; # remove any non-word characters (in case of crappy IDs)
 
         ## try to open the file $off_file
         open(my $off_out_file, ">", $off_file) or die("Can't open $off_file.");
         $logger->debug("Create output file $off_file.");
+        
+        ## append $off_file to $off_files_list
+        open( my $off_list ,">>", $off_files_list) or die("Can't open $off_files_list.");
+        print $off_list $off_file ."\n";
+        close($off_list);
 
         ## try to open the file $fasta_file
-        open(FASTAFILE, ">$fasta_file") or die("Can't open $fasta_file.");
+        open(my $fasta_out_file, ">", $fasta_file) or die("Can't open $fasta_file.");
         $logger->debug("Create output file $fasta_file.");
+
+        ## append $fasta_file to $fasta_files_list
+        open( my $fasta_list ,">>", $fasta_files_list) or die("Can't open $fasta_files_list.");
+        print $fasta_list $fasta_file ."\n";
+        close($fasta_list);
 
         ## $ndb_id - holds the id of the molecule
         print $off_out_file  "> $ndb_id.$key\n" ;
-        print FASTAFILE "> $ndb_id.$key\n";
+        print $fasta_out_file "> $ndb_id.$key\n";
         $logger->debug("Header: > $ndb_id");
 
         ## $sequence - holds the RNA sequence
         my $sequence = join("", @{$data->{'molecule'}->{$key}->{'sequence'}[0]->{'seq-data'}});
         $sequence = &trimString($sequence);
         print $off_out_file "$sequence\n";
-        print FASTAFILE "$sequence\n";
+        print $fasta_out_file "$sequence\n";
         $logger->debug("Sequence: $sequence");
         
         ## @dotBracket - holds all Watson-Crick base pairs in Dot-Bracket form
@@ -212,10 +236,12 @@ foreach my $rnaml_file ( @rnamlFiles ){
             print $off_out_file "$dbLine\n";
             $logger->debug($dbLine);
             
-            ## $colSizeLine - assemble the line that holds the column sizes 
-            my $colSizeLine = "# ". length($notation) .";".join(";", @colSize);
-            print( $off_out_file, $colSizeLine."\n" );
-            $logger->debug($colSizeLine);
+            ## $colSizeLine - assemble the line that holds the column sizes
+            if ( scalar(@colSize) > 0 ) {
+                my $colSizeLine = "# ". length($notation) .";".join(";", @colSize) ;
+                print $off_out_file $colSizeLine."\n" ;
+                $logger->debug($colSizeLine);
+            }
 
             # sort the keys with a specific subroutine
             foreach my $key (@bpStart5p){
@@ -237,7 +263,7 @@ foreach my $rnaml_file ( @rnamlFiles ){
         # clear %bp or the next
         %bp = ();
         close($off_out_file);
-        close(FASTAFILE);
+        close($fasta_out_file);
     }
 }
 
@@ -461,7 +487,7 @@ sub colSizeUpdate{
         if ( ! defined $colSize->[$i] ){
             $colSize->[$i] = 0;
         }
-        if ( length($bpLW[$i]) + 2 > $colSize->[$i] ){
+        if ( $colSize->[$i] < length($bpLW[$i]) + 2 ){
             # the addition of 2 results in a more readable output
             $colSize->[$i] = length($bpLW[$i]) + 2;
         }
@@ -521,7 +547,7 @@ __END__
 
 =head1 SYNOPSIS
 
- rnaml2off.pl converts a bunch of .rnaml files into .off files.
+ rnaml2off.pl converts a bunch of rna1.xml files into .off and .fa files.
 
 =head1 DESCRIPTION
 

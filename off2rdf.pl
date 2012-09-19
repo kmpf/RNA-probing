@@ -22,11 +22,6 @@
 use strict;
 use warnings;
 use feature "switch";
-use lib "/home/hubert/bin/RNAprobing";
-require RNAprobing::RDATFile;
-require RNAprobing::OFFFile;
-require RNAprobing::BLASTresult;
-require RNAprobing::RNAupFile;
 use Data::Dumper;
 use File::Basename;
 use Getopt::Long;
@@ -38,6 +33,13 @@ use Pod::Usage;
 use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
+my $module_dir = dirname(__FILE__);
+$module_dir =~ s/scripts$/RNAprobing/g;
+push(@INC, $module_dir);
+require RNAprobing::RDATFile;
+require RNAprobing::OFFFile;
+require RNAprobing::BLASTresult;
+require RNAprobing::RNAupFile;
  
 ###############################################################################
 #
@@ -197,8 +199,8 @@ sub generate_rdf_model {
         }
         my $five_prime_nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$edge[1]-1].$edge[1];
         my $three_prime_nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$edge[2]-1].$edge[2];
-        if ( $edge[3] =~ /^[ct!][WHST][WHST]$/ ) {
-            $edge[3] =~ /^([ct!])([WHST])([WHST])$/;
+        if ( $edge[3] =~ /^[ct!][WEHST][WEHST]$/ ) {
+            $edge[3] =~ /^([ct!])([WEHST])([WEHST])$/;
             my $orientation = $1;
             my $five_prime_edge = $2;
             my $three_prime_edge = $3;
@@ -259,13 +261,17 @@ sub insert_edge {
     # edge types
     my $hoogsteen_edge_uri = 'bioinf:HoogsteenEdge';
     my $sugar_edge_uri = 'bioinf:SugarEdge';
-    my $watson_crick_edge_uri = 'bioinf:WatsonCrickEdge';
+    my $std_watson_crick_edge_uri = 'bioinf:StandardWatsonCrickEdge';
+    my $non_std_watson_crick_edge_uri = 'bioinf:NonStandardWatsonCrickEdge';
 
     # object properties
     my $has_edge_uri = 'bioinf:hasEdge';
 
     if ( $edge_type eq 'W') {
-        $rdf_model->assert_resource($edge_uri, 'rdf:type', $watson_crick_edge_uri);
+        $rdf_model->assert_resource($edge_uri, 'rdf:type', $std_watson_crick_edge_uri);
+        $rdf_model->assert_resource($nuc_uri, $has_edge_uri, $edge_uri);
+    } elsif ($edge_type eq 'E') {
+        $rdf_model->assert_resource($edge_uri, 'rdf:type', $non_std_watson_crick_edge_uri);
         $rdf_model->assert_resource($nuc_uri, $has_edge_uri, $edge_uri);
     } elsif ($edge_type eq 'H') {
         $rdf_model->assert_resource($edge_uri, 'rdf:type', $hoogsteen_edge_uri);
@@ -279,8 +285,6 @@ sub insert_edge {
     }
     return $rdf_model;
 }
-
-
 
 
 

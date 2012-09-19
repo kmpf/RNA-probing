@@ -23,11 +23,6 @@ use warnings;
 use utf8;
 
 use feature "switch";
-use lib "/home/hubert/bin/RNAprobing";
-require ProbingRNA::RDATFile;
-require ProbingRNA::OFFFile;
-require ProbingRNA::BLASTresult;
-require ProbingRNA::RNAupFile;
 use Data::Dumper;
 use File::Basename;
 use Getopt::Long;
@@ -39,7 +34,14 @@ use Pod::Usage;
 use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
- 
+my $module_dir = dirname(__FILE__);
+$module_dir =~ s/scripts$/RNAprobing/g;
+push(@INC, $module_dir); 
+require ProbingRNA::RDATFile;
+require ProbingRNA::OFFFile;
+require ProbingRNA::BLASTresult;
+require ProbingRNA::RNAupFile;
+
 ###############################################################################
 #
 # Options section

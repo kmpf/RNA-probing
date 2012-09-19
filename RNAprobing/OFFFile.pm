@@ -18,9 +18,16 @@ sub new {
     $self->{"NR_OF_EDGES"} = 0;
     $self->{"EDGES"} = [];
 
+    $self->read_file() if ( $self->{"FILENAME"} );
+    
+    bless( $self, $classname );
+    return $self;
+}
+
+sub read_file {
     my $line_number = 0;
     
-    open ( OFF_FILE , "<$self->{FILENAME}") or die "Couldn't open file $self->{FILENAME}. Error: $!";
+    open ( my $off_file , "<", $self->{FILENAME}) or die "Couldn't open file $self->{FILENAME}. Error: $!";
     while (my $line = <OFF_FILE>) {
         next if ($line =~ /^##/);
         $line_number++;
@@ -70,13 +77,12 @@ sub new {
         }
         
     }
-    close(OFF_FILE);
-    close(FH);
-
-    bless( $self, $classname );
-    return $self;
+    close($off_file);
 }
 
+sub write_file {
+
+}
 ###############################################################
 ##
 ##  Subroutine section
