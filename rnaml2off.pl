@@ -159,9 +159,9 @@ foreach my $rnaml_file ( @rnamlFiles ){
         $logger->debug("NDB ID of $rnaml_file is $ndb_id.");
         $logger->debug("Key of actual molecule is $key.");
 
-        my $fasta_file = "$ndb_id.$key.fa";
+        my $fasta_file = $directories . $ndb_id .".". $key .".fa";
         $fasta_file =~ s/[^\w\.]//g; # remove any non-word characters (in case of crappy IDs)
-        my $off_file = "$ndb_id.$key.off";
+        my $off_file = $directories . $ndb_id .".". $key .".off";
         $off_file =~ s/[^\w\.]//g; # remove any non-word characters (in case of crappy IDs)
 
         ## try to open the file $off_file
