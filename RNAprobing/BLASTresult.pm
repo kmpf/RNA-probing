@@ -1,4 +1,4 @@
-package ProbingRNA::BLASTresult;
+package RNAprobing::BLASTresult;
 
 use strict;
 use warnings;

@@ -1,4 +1,4 @@
-package ProbingRNA::OFFFile;
+package RNAprobing::OFFFile;
 
 use strict;
 use warnings;

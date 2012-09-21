@@ -1,4 +1,4 @@
-package ProbingRNA::RDATFile;
+package RNAprobing::RDATFile;
 
 use strict;
 use warnings;

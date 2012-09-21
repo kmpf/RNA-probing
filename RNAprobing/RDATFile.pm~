@@ -1,4 +1,4 @@
-package ProbingRNA::RDATFile;
+package RNAProbing::RDATFile;
 
 use strict;
 use warnings;
@@ -363,7 +363,7 @@ sub _href_to_string{
     my ($self, $href) = @_;
     my $line = "";
     foreach my $key ( keys( %{ $href } ) ) {
-        $line = " ".$key.":".$href->{$key});
+        $line = " ".$key.":".$href->{$key};
     }
     return $line;
 }

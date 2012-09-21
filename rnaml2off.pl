@@ -74,39 +74,20 @@ pod2usage(-verbose => 1) && exit if ( $help );
 pod2usage(-verbose => 1) && exit if ( scalar(@files) == 0 && scalar(@directories) == 0 );
 pod2usage(-verbose => 2) && exit if ( $man );
 
-my @rnamlFiles = ();
-
-## Lookup @files and @directories for rna1.xml files and insert the found in @rnamlFiles
+## Lookup @files and @directories for rna1.xml files and insert the found in @rnaml_files
 ##  - find all rna1.xml files in the @directories given and add them to @files
 foreach (@directories) {
     if ( -d $_ ) {
         $logger->info("$_ is a directory");
         $logger->info("Looking for rna1.xml files in $_");
-
-        $logger->info( find(\&wanted, $_) );
+        $logger->info( find( sub { push( @files, $File::Find::name) if ($_ =~ /rna1\.xml$/) }, $_) );
     } else {
         $logger->info("$_ isn't a directory");
     }
 }
 
-##  - check found files and add them to @rnamlFiles if they passed the checks
-foreach (@files) {
-    $logger->info("Perform file checks for file $_");
-    if ( -f $_){
-        $logger->info("$_ is a plain file");
-        if ( -r $_) {
-            my $abs_path = File::Spec->rel2abs( $_ );
-            $logger->info("$_ can be accessed");
-            push(@rnamlFiles, $abs_path );
-            $logger->debug("Absolute path: $abs_path");
-        } else {
-            $logger->error("Can not access $_");
-        }
-    } else {
-        $logger->error("$_ is not a plain file");
-        $logger->error("$_ is a directory") if ( -d $_);
-    }
-}
+##  - check found files and add them to @rnaml_files if they passed the checks
+my @rnaml_files = &checkFiles(@files);
 
 ## Check for correct notation selection ##
 my $notation = "";
@@ -141,7 +122,7 @@ my $xml = new XML::Simple;
 
 # parse XML files
 
-foreach my $rnaml_file ( @rnamlFiles ){
+foreach my $rnaml_file ( @rnaml_files ){
     ## $data - is the XML::Simple object that holds the representation of the RNAML file
     my $data = $xml->XMLin($rnaml_file, ForceArray => 1);
 
@@ -160,38 +141,36 @@ foreach my $rnaml_file ( @rnamlFiles ){
         $logger->debug("Key of actual molecule is $key.");
 
         my $fasta_file = $directories . $ndb_id .".". $key .".fa";
-        $fasta_file =~ s/[^\w\.]//g; # remove any non-word characters (in case of crappy IDs)
         my $off_file = $directories . $ndb_id .".". $key .".off";
-        $off_file =~ s/[^\w\.]//g; # remove any non-word characters (in case of crappy IDs)
 
         ## try to open the file $off_file
-        open(my $off_out_file, ">", $off_file) or die("Can't open $off_file.");
+        open(my $off_fh, ">", $off_file) or die("Can't open $off_file.");
         $logger->debug("Create output file $off_file.");
         
         ## append $off_file to $off_files_list
-        open( my $off_list ,">>", $off_files_list) or die("Can't open $off_files_list.");
-        print $off_list $off_file ."\n";
-        close($off_list);
+        open( my $off_list_fh ,">>", $off_files_list) or die("Can't open $off_files_list.");
+        print $off_list_fh $off_file ."\n";
+        close($off_list_fh);
 
         ## try to open the file $fasta_file
-        open(my $fasta_out_file, ">", $fasta_file) or die("Can't open $fasta_file.");
+        open(my $fasta_out_fh, ">", $fasta_file) or die("Can't open $fasta_file.");
         $logger->debug("Create output file $fasta_file.");
 
         ## append $fasta_file to $fasta_files_list
-        open( my $fasta_list ,">>", $fasta_files_list) or die("Can't open $fasta_files_list.");
-        print $fasta_list $fasta_file ."\n";
-        close($fasta_list);
+        open( my $fasta_list_fh ,">>", $fasta_files_list) or die("Can't open $fasta_files_list.");
+        print $fasta_list_fh $fasta_file ."\n";
+        close($fasta_list_fh);
 
         ## $ndb_id - holds the id of the molecule
-        print $off_out_file  "> $ndb_id.$key\n" ;
-        print $fasta_out_file "> $ndb_id.$key\n";
+        print $off_fh  "> $ndb_id.$key\n" ;
+        print $fasta_out_fh "> $ndb_id.$key\n";
         $logger->debug("Header: > $ndb_id");
 
         ## $sequence - holds the RNA sequence
         my $sequence = join("", @{$data->{'molecule'}->{$key}->{'sequence'}[0]->{'seq-data'}});
         $sequence = &trimString($sequence);
-        print $off_out_file "$sequence\n";
-        print $fasta_out_file "$sequence\n";
+        print $off_fh "$sequence\n";
+        print $fasta_out_fh "$sequence\n";
         $logger->debug("Sequence: $sequence");
         
         ## @dotBracket - holds all Watson-Crick base pairs in Dot-Bracket form
@@ -233,13 +212,13 @@ foreach my $rnaml_file ( @rnamlFiles ){
             }
             ## $dbString - is the output string of the Dot-Bracket notation
             my $dbLine = join("", @dotBracket);
-            print $off_out_file "$dbLine\n";
+            print $off_fh "$dbLine\n";
             $logger->debug($dbLine);
             
             ## $colSizeLine - assemble the line that holds the column sizes
             if ( scalar(@colSize) > 0 ) {
                 my $colSizeLine = "# ". length($notation) .";".join(";", @colSize) ;
-                print $off_out_file $colSizeLine."\n" ;
+                print $off_fh $colSizeLine."\n" ;
                 $logger->debug($colSizeLine);
             }
 
@@ -247,7 +226,7 @@ foreach my $rnaml_file ( @rnamlFiles ){
             foreach my $key (@bpStart5p){
                 my $line = "# ".$notation;
                 $line .= &makeColString($bp{$key}, \@colSize);
-                print $off_out_file "$line\n";
+                print $off_fh "$line\n";
                 $logger->debug("$line");
             }
         }
@@ -262,8 +241,8 @@ foreach my $rnaml_file ( @rnamlFiles ){
         }
         # clear %bp or the next
         %bp = ();
-        close($off_out_file);
-        close($fasta_out_file);
+        close($off_fh);
+        close($fasta_out_fh);
     }
 }
 
@@ -274,6 +253,39 @@ foreach my $rnaml_file ( @rnamlFiles ){
 ##
 ###############################################################
 
+###############################################################
+##
+## &checkFiles(@filesToBeChecked)
+## - Performs file checks and returns an array with all succesfully checked files
+## - @filesToBeChecked = array of files to be checked
+##
+###############################################################
+
+sub checkFiles {
+    my @testfiles = shift;
+    my @checkedfiles = ();
+    my $logger = get_logger("RNAprobing");
+
+    foreach (@testfiles) {
+        $logger->info("Perform file checks for file $_");
+        if ( -f $_){
+            $logger->info("$_ is a plain file");
+            if ( -r $_) {
+                my $abs_path = File::Spec->rel2abs( $_ );
+                $logger->info("$_ can be accessed");
+                push(@checkedfiles, $abs_path );
+                $logger->debug("Absolute path: $abs_path");
+            } else {
+                $logger->error("Can not access $_");
+            }
+        } else {
+            $logger->error("$_ is not a plain file");
+            $logger->error("$_ is a directory") if ( -d $_);
+        }
+    }
+    return @checkedfiles;
+}
+
 ###############################################################################
 ##              
 ##  Invocation - \&wanted
@@ -283,7 +295,6 @@ foreach my $rnaml_file ( @rnamlFiles ){
 
 sub wanted {
     my $logger = get_logger("RNAprobing");
-    my $file = $_;
     if ( $_ =~ /rna1\.xml$/ ) {
         $logger->info("$_ is a rna1.xml file");
         # @files is a global variable

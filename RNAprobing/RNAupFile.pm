@@ -1,4 +1,4 @@
-package ProbingRNA::RNAupFile;
+package RNAprobing::RNAupFile;
 
 use strict;
 use warnings;

@@ -1,9 +1,9 @@
 #!/usr/bin/env perl 
 #===============================================================================
 #
-#         FILE: test.pl
+#         FILE: blat.pl
 #
-#        USAGE: ./test.pl  
+#        USAGE: ./blat.pl
 #
 #  DESCRIPTION: 
 #
@@ -14,23 +14,17 @@
 #       AUTHOR: Christoph Kaempf (CK), kaempf@bioinf.uni-leipzig.de
 # ORGANIZATION: 
 #      VERSION: 1.0
-#      CREATED: 19.07.2012 11:03:53
+#      CREATED: 05.08.2012 15:28:44
 #     REVISION: ---
 #===============================================================================
 
+## Loading modules and initializing variables ##
+
+## Loading modules and initializing variables ##
 use strict;
 use warnings;
 use utf8;
 
-my %hash = (1 => "eins");
-my @array = ("1", "2");
+`blat database.fa query.fa -q=rna -out=blast8 out.psl`;
 
-$hash{"ARRAY_REF"} = \@array;
-
-my @rarray = @$hash{"ARRAY_REF"};
-
-print scalar( @rarray )."\n"; 
-# @array = ();
-$hash->{"ARRAY_REF"} = [];
-print ref %hash;
-print scalar( @$hash{"ARRAY_REF"} )." ".scalar( @array ) ."\n"; 
+#system("blat", "-q=rna", "-minIdentity=98", "-out=blast8", "database.fa", "query.fa", "out.blast_out");
