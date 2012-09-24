@@ -121,8 +121,8 @@ open( my $query_fh,  ">", $query) or die ("Can't open $query.");
 print $query_fh join("\n", @query_files);
 close($query_fh);
 
-my $result_file = $db.".blast.out";
-system("bash", "blat", "-q=rna", "-minIdentity=98", "-out=blast8", $db, $query, $result_file.".blast_out") == 0 
+my $result_file = $db;
+system( "blat", "-q=rna", "-minIdentity=98", "-out=blast8", $db, $query, $result_file.".blast_out" ) == 0 
         or die ("Error during execution of BLAT search.\n $!");
 
 ###############################################################
@@ -174,3 +174,49 @@ sub configureLogger{
     return $logger;
 }
 
+__END__
+
+=head1 NAME
+
+blat.pl - Using BLAT to find similar sequences between a single, so called, database file and different query sequences
+
+=head1 SYNOPSIS
+
+ blat.pl -d </path/to/database.fa> -u </path/to/fa-files/>  -v -v -v
+ blat.pl --database </path/to/database.fa> --query-directory </path/to/fa-files/> 
+
+=head1 OPTIONS
+
+=over 4
+
+=item -d, --database=</path/to/database-file>
+
+The database is a single fasta file containing a DNA sequence.
+
+=item -q, --query=</path/to/file.list>
+
+The file given lists the path to a fasta file per line. The sequence contained in every file is used as query.
+
+=item -u, --query-directory=</path/to/fasta-directory/>
+
+Every fasta file (ending on .fa) in this directory and all its subdirectories is used as a query sequence. The option can be given multiple times.
+
+=item -f, --query-file=</path/to/file.fa>
+
+A single fasta file can be given to this option. The option can be given multiple times.
+
+=item -v, --verbose
+
+This option increases the verbosity level everytime it is given.
+
+
+=head1 DESCRIPTION
+
+This script starts a BLAT sequence similarirty search. It compares the database sequence with the sequences given in the "query" files. All query files found are written as a list into a file named 
+"<database>.query.list". And the result is written into a file named "<database>.blast_out".
+
+ This perl script relies on the Log::Log4perl, Path::Class and XML::Simple modules. Please make sure the according packages are around on your system.
+
+=head1 ARGUMENTS
+
+=cut
