@@ -84,6 +84,7 @@ $regex = qr/$regex/;
 foreach my $rdat_file ( @{ $rdat_files } ) {
     my($filename, $directories, $suffix) = fileparse($rdat_file);
     my $fasta_file = $directories.$filename;
+    $fasta_file =~ s/\.rdat$//g;
     my $rdat_object = RNAprobing::RDATFile->new($rdat_file);
     my $sequence = $rdat_object->sequence();
     if ($to_dna) {
@@ -200,21 +201,25 @@ rdat2fasta.pl -f=</path/to/file> -v -v -v -t
 
 =over 4
 
-=item -f, --file=</path/to/file>
+=item -f, --file=</path/to/file.rdat>
 
-RDAT file(s) to be converted to FASTA files
+RDAT file(s) to be converted to FASTA files. Option can be given multiple times.
+
+=item -d, --directory=</path/to/rdat-directory/>
+
+The given directories will be searched for "*.rdat" files which will be converted. Option can be given multiple times.
 
 =item -t, --toDNA
 
-if set convert RNA sequences are converted into DNA sequences
+If set RNA sequences are converted into DNA sequences. The resulting file ends on ".dna.fa".
 
 =item -v, --verbose
 
-verbosity level increases by multiple times option given
+Increases verbosity level. Option can be given multiple times.
 
 =item -h, --help
 
-prints this help page
+Prints this help page.
 
 =back
 

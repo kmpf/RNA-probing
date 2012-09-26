@@ -121,7 +121,6 @@ sub wanted {
         $logger->info($File::Find::name." is a .rdat file");
         # @files is a global variable
         push(@files, $File::Find::name);
-        $logger->info("\@files: ". join(";", @files));
     } else {
         $logger->info("$_ is not a .rdat file");
     }
@@ -165,7 +164,6 @@ sub checkFiles {
     my $testfiles = shift;
     my @checkedfiles = ();
     my $logger = get_logger("RNAprobing");
-    $logger->info("\@testfiles: ". join(";", @{ $testfiles}));
     foreach my $testfile (@{ $testfiles}) {
         $logger->info("Perform file checks for file $testfile");
         if ( -f $testfile ){
@@ -183,7 +181,6 @@ sub checkFiles {
             $logger->error("$_ is a directory") if ( -d $testfile);
         }
     }
-    $logger->info("\@checkedfiles: ". join(";", @checkedfiles));
     return \@checkedfiles;
 }
 
@@ -203,21 +200,25 @@ rdat2fasta.pl -f=</path/to/file> -v -v -v -t
 
 =over 4
 
-=item -f, --file=</path/to/file>
+=item -f, --file=</path/to/file.rdat>
 
-RDAT file(s) to be converted to FASTA files
+RDAT file(s) to be converted to FASTA files. Option can be given multiple times.
+
+=item -d, --directory=</path/to/rdat-directory/>
+
+The given directories will be searched for "*.rdat" files which will be converted. Option can be given multiple times.
 
 =item -t, --toDNA
 
-if set convert RNA sequences are converted into DNA sequences
+If set RNA sequences are converted into DNA sequences. The resulting file ends on ".dna.fa".
 
 =item -v, --verbose
 
-verbosity level increases by multiple times option given
+Increases verbosity level. Option can be given multiple times.
 
 =item -h, --help
 
-prints this help page
+Prints this help page.
 
 =back
 

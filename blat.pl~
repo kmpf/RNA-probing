@@ -19,8 +19,6 @@
 #===============================================================================
 
 ## Loading modules and initializing variables ##
-
-## Loading modules and initializing variables ##
 use strict;
 use warnings;
 use utf8;
@@ -50,6 +48,11 @@ GetOptions(
     "query-directory|u=s" => \@query_directories,
     "query-file|f=s" => \@query_files,
 	"verbose|v+" => \$verbose);
+
+if ( $help || $database eq "" || scalar(@query_files) == 0 && scalar(@query_directories) == 0){
+    pod2usage( { -verbose => 1,
+                 -message => "Use this script like this:\n"});
+}
 
 ###############################################################################
 #                 

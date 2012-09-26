@@ -49,6 +49,11 @@ GetOptions(
     "query-file|f=s" => \@query_files,
 	"verbose|v+" => \$verbose);
 
+if ( $help || $database eq "" || scalar(@query_files) == 0 && scalar(@query_directories) == 0){
+    pod2usage( { -verbose => 1,
+                 -message => "Use this script like this:\n"});
+}
+
 ###############################################################################
 #                 
 # Logger initiation  
@@ -98,6 +103,7 @@ my ($content, $is_rna, $db) = (undef, undef, $database);
 
 open(my $database_fh, "<", $database) or die ("Can't open $database.");
 while ( <$database_fh> ) {
+    next if ( $_ =~ /^>/);
     if ( $_ =~ /[Uu]/) {
         $is_rna = 1;
         $db = $dna_database;
