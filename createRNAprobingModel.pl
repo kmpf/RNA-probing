@@ -49,6 +49,7 @@ require ProbingRNA::RNAupFile;
 ################################################################################
 my $blast_result = "";
 my $csv = 0;
+my $help = 0;
 my $off_file = "";
 my $rdat_file = "";
 my $rnaup_file = "";
@@ -63,6 +64,11 @@ GetOptions(
     "rnaup=s" => \$rnaup_file,
     "rdf" => \$rdf_out,
     "verbose|v+" => \$verbose);
+
+if ( $help || $off_file eq "" || $rdat_file eq "" || $rnaup_file eq "" ){
+    pod2usage( { -verbose => 1,
+                 -message => "Use this script like this:\n"});
+}
 
 ###############################################################################
 #                 
