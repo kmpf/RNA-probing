@@ -94,7 +94,7 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
         $fasta_file .= ".fa";
     }
     open(my $fasta_fh, ">", $fasta_file) or die("Can't open $fasta_file.");
-    print $fasta_fh ">".$rdat_object->name()."\n";
+    print $fasta_fh ">".$filename."\n";
     print $fasta_fh $sequence."\n";
     close($fasta_fh);
 }
@@ -107,12 +107,12 @@ $logger->info(join(";", @{ $rdat_files}));
 ##
 ###############################################################
 
-###############################################################################
+###############################################################
 ##              
 ##  Invocation - \&wanted
 ##      - Subroutine used by File::Find
 ##
-###############################################################################
+###############################################################
 
 sub wanted {
     my $logger = get_logger("RNAprobing");

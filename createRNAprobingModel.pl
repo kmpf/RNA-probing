@@ -65,7 +65,7 @@ GetOptions(
     "rdf" => \$rdf_out,
     "verbose|v+" => \$verbose);
 
-if ( $help || $off_file eq "" || $rdat_file eq "" || $rnaup_file eq "" ){
+if ( $help || $off_file eq "" || $rdat_file eq "" || $rnaup_file eq "" || $blast_result eq "" ){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
 }
@@ -109,7 +109,7 @@ my @rdat_seqpos     = @{$rdat_object->seqpos()};
 my $off_object      = ProbingRNA::OFFFile->new($off_file);
 my @off_seq         = split(//, $off_object->sequence());
 
-# creation of .rdat object and information extraction
+# creation of BLASTresult object and information extraction
 my $blast_result_object = ProbingRNA::BLASTresult->new($blast_result);
 
 # creation of RNAup file object and information extraction
