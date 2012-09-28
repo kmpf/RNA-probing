@@ -7,6 +7,7 @@ use Log::Log4perl qw(get_logger :levels);
 sub new {
     my $self = {};
     my $classname = shift;
+    bless( $self, $classname );
     my $logger = get_logger();
 
     $self->{"FILENAME"} = shift;
@@ -20,15 +21,17 @@ sub new {
 
     $self->read_file() if ( $self->{"FILENAME"} );
     
-    bless( $self, $classname );
+
     return $self;
 }
 
 sub read_file {
+    my $self = shift;
+    my $logger = get_logger();
     my $line_number = 0;
     
-    open ( my $off_file , "<", $self->{FILENAME}) or die "Couldn't open file $self->{FILENAME}. Error: $!";
-    while (my $line = <OFF_FILE>) {
+    open ( my $off_file , "<", $self->{"FILENAME"}) or die "Couldn't open file $self->{FILENAME}. Error: $!";
+    while (my $line = <$off_file>) {
         next if ($line =~ /^##/);
         $line_number++;
         chomp( $line );

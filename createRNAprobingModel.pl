@@ -37,10 +37,10 @@ use Path::Class;
 my $module_dir = dirname(__FILE__);
 $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
-require ProbingRNA::RDATFile;
-require ProbingRNA::OFFFile;
-require ProbingRNA::BLASTresult;
-require ProbingRNA::RNAupFile;
+require RNAprobing::RDATFile;
+require RNAprobing::OFFFile;
+require RNAprobing::BLASTresult;
+require RNAprobing::RNAupFile;
 
 ###############################################################################
 #
@@ -54,6 +54,7 @@ my $off_file = "";
 my $rdat_file = "";
 my $rnaup_file = "";
 my $rdf_out = 0;
+my $owl_file ="";
 my $verbose = 0;
 
 GetOptions(
@@ -63,6 +64,7 @@ GetOptions(
     "rdat=s" => \$rdat_file,
     "rnaup=s" => \$rnaup_file,
     "rdf" => \$rdf_out,
+    "owl=s"=> \$owl_file,
     "verbose|v+" => \$verbose);
 
 if ( $help || $off_file eq "" || $rdat_file eq "" || $rnaup_file eq "" || $blast_result eq "" ){
@@ -75,8 +77,9 @@ if ( $help || $off_file eq "" || $rdat_file eq "" || $rnaup_file eq "" || $blast
 # Logger initiation  
 #                 
 ###############################################################################
-
-my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
+my $this_file = __FILE__;
+$this_file =~ s/scripts/RNAprobing/g;
+my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
@@ -95,9 +98,10 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 $blast_result = &checkFiles($blast_result);
 $off_file = &checkFiles($off_file);
 $rdat_file = &checkFiles($rdat_file);
+$owl_file = &checkFiles($owl_file);
 
 # creation of RDAT file object and information extraction
-my $rdat_object     = ProbingRNA::RDATFile->new($rdat_file);
+my $rdat_object     = RNAprobing::RDATFile->new($rdat_file);
 my $rdat_filename   = fileparse($rdat_object->filename());
 my $rdat_offset     = $rdat_object->offset();
 my $rdat_reactivity = $rdat_object->reactivity();
@@ -106,14 +110,14 @@ my @rdat_seq        = split(//, $rdat_object->sequence());
 my @rdat_seqpos     = @{$rdat_object->seqpos()};
 
 # creation of OFF file object and information extraction
-my $off_object      = ProbingRNA::OFFFile->new($off_file);
+my $off_object      = RNAprobing::OFFFile->new($off_file);
 my @off_seq         = split(//, $off_object->sequence());
 
 # creation of BLASTresult object and information extraction
-my $blast_result_object = ProbingRNA::BLASTresult->new($blast_result);
+my $blast_result_object = RNAprobing::BLASTresult->new($blast_result);
 
 # creation of RNAup file object and information extraction
-my $rnaup_object    = ProbingRNA::RNAupFile->new($rnaup_file);
+my $rnaup_object    = RNAprobing::RNAupFile->new($rnaup_file);
 
 ###############################################################################
 #                 
@@ -206,7 +210,7 @@ my @match_in_off = @off_seq[($off_query_start - 1) .. ($off_query_end - 1)];
 my @rnaup_values = @{$rnaup_object->rnaup_values()}[($off_query_start - 1) .. ($off_query_end - 1)];
 my @match_in_rdat = @rdat_seq[($rdat_subject_start - 1) .. ($rdat_subject_end - 1)];
 
-if ( join("",@match_in_off) ne join("",@match_in_rdat) ){
+if ( uc(join("",@match_in_off)) ne uc(join("",@match_in_rdat)) ){
     $logger->error("Sequence in the RDAT file ".$rdat_object->filename());
     $logger->error(join("",@match_in_rdat));
     $logger->error("is unequal with sequence in OFF file ".$off_object->filename());
@@ -244,6 +248,7 @@ my $querypos_reactivity = &create_querypos_reactivity( $rdat_seqpos_reactivity, 
 my $querypos_reactivity_prob = &calculate_probability_from_experimental_reactivtity($querypos_reactivity);
 
 if ( $csv ){
+    $logger->info("CSV file containing RNAup and reactivity is going to be created.");
     my $csv_filename = fileparse($off_object->filename());
     $csv_filename =~ s/off$/csv/g;
     &create_csv_file( $csv_filename, \%querypos_rnaup_energies, \%querypos_rnaup_prob,
@@ -252,7 +257,8 @@ if ( $csv ){
 
 
 if ( $rdf_out ){
-    &generate_rdf_model( \@off_seq, $off_query_start, $off_query_end, \%querypos_rnaup_prob, $querypos_reactivity_prob, $rdat_object, $off_object );
+    $logger->info("RDF/XML model is going to be created.");
+    &generate_rdf_model( \@off_seq, $off_query_start, $off_query_end, \%querypos_rnaup_prob, $querypos_reactivity_prob, $rdat_object, $off_object, $owl_file );
 }
 
 
@@ -361,7 +367,7 @@ sub calculate_probability_from_experimental_reactivtity {
             $querypos_reactivity_prob[$i]{$key} = $prob->bstr();
         }
     }
-    $logger->debug( Dumper(@querypos_reactivity_prob) );
+#    $logger->debug( Dumper(@querypos_reactivity_prob) );
     return \@querypos_reactivity_prob;
 }
 
@@ -381,8 +387,8 @@ sub generate_rdf_model {
     my $querypos_reactivity_prob = shift;
     my $rdat_object = shift;
     my $off_object = shift;
+    my $owl_file = shift;
     my $logger = get_logger();
-
     my $rdf_filename = fileparse($off_object->filename());
     $rdf_filename =~ s/off$/rdf/g;
 
@@ -406,7 +412,7 @@ sub generate_rdf_model {
     my $parser = RDF::Trine::Parser->new( 'rdfxml' );
     my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
     my $model = $rdf->model();
-    $parser->parse_file_into_model( $base_uri, '/home/hubert/Data/ontologies/RNAprobing.owl', $model );
+    $parser->parse_file_into_model( $base_uri, $owl_file, $model );
 
     # define classes
 
@@ -522,10 +528,11 @@ sub generate_rdf_model {
     }
 
     
-    open (FH, ">$rdf_filename");
+    open (my $rdf_fh, ">", $rdf_filename)  or die("Can't open $rdf_filename.");
     my $string = $rdf->serialize( format => 'rdfxml');
 #    my $string = $rdf->serialize( format => 'turtle');
-    print (FH $string);
+    $logger->info("$string");
+    print $rdf_fh $string;
 
     return;
 }
@@ -598,31 +605,33 @@ sub create_querypos_reactivity {
     return \@querypos_reactivity;
 }
 
-###############################################################################
+###############################################################
 ##
 ## &configureLogger($verbosityLevel)
 ## - Configures and initialzes the Logger
 ## - $verbosityLevel = scalar value that sets log level
-## -- 0 => $WARN
-## -- 1 => $INFO
-## -- 2 => $DEBUG
+## -- 0 => $ERROR
+## -- 1 => $WARN
+## -- 2 => $INFO
+## -- >2 => $DEBUG
 ## 
-###############################################################################
+###############################################################
 
 sub configureLogger{
     ## Configure the logger ##
     my $verbose = shift;
     my $logger_name = shift;
     my $logger = get_logger($logger_name);
+    $logger->info("Verbosity level: $verbose");
+    print Dumper($logger);
     SELECT:{
-	    if ($verbose == 0){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
-	    if ($verbose == 1){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
-	    if ($verbose == 2){ $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
-	    else {$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
+	    if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
+	    else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
     }
     return $logger;
 }
-
 ###############################################################################
 ##
 ## &checkFiles(@filesToBeChecked)

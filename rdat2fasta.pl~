@@ -22,6 +22,7 @@
 use strict;
 use warnings;
 use utf8;
+use Data::Dumper;
 use File::Basename;
 use File::Find;
 use Getopt::Long;
@@ -65,13 +66,14 @@ Log::Log4perl->init("$log4perl_conf");
 # Get the logger
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
+
 print("++++ ".__FILE__." has been started. ++++\n");
 $logger->info("++++ ".__FILE__." has been started. ++++");
 
 
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnamlFiles
 ##  - find all rna1.xml files in the @directories given and add them to @files
-find( \&wanted, @directories);
+find( \&wanted, @directories) unless ( scalar(@directories) == 0 );
 $logger->info("\@files after find(): ". join(";", @files));
 
 ##  - check found files and add them to @rdat_files if they passed the checks
@@ -94,7 +96,7 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
         $fasta_file .= ".fa";
     }
     open(my $fasta_fh, ">", $fasta_file) or die("Can't open $fasta_file.");
-    print $fasta_fh ">".$rdat_object->filename()."\n";
+    print $fasta_fh ">".$filename."\n";
     print $fasta_fh $sequence."\n";
     close($fasta_fh);
 }
@@ -132,9 +134,10 @@ sub wanted {
 ## &configureLogger($verbosityLevel)
 ## - Configures and initialzes the Logger
 ## - $verbosityLevel = scalar value that sets log level
-## -- 0 => $WARN
-## -- 1 => $INFO
-## -- 2 => $DEBUG
+## -- 0 => $ERROR
+## -- 1 => $WARN
+## -- 2 => $INFO
+## -- >2 => $DEBUG
 ## 
 ###############################################################
 
@@ -144,11 +147,12 @@ sub configureLogger{
     my $logger_name = shift;
     my $logger = get_logger($logger_name);
     $logger->info("Verbosity level: $verbose");
+    print Dumper($logger);
     SELECT:{
-	    if ($verbose == 0){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
-	    if ($verbose == 1){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
-	    if ($verbose == 2){ $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
-	    else {$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
+	    if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
+	    else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
     }
     return $logger;
 }
