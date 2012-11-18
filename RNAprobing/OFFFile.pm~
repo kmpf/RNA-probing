@@ -31,7 +31,7 @@ sub read_file {
     my $line_number = 0;
     
     open ( my $off_file , "<", $self->{"FILENAME"}) or die "Couldn't open file $self->{FILENAME}. Error: $!";
-    while (my $line = <$off_file>) {
+    while (my $line = <OFF_FILE>) {
         next if ($line =~ /^##/);
         $line_number++;
         chomp( $line );

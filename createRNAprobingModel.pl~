@@ -1,9 +1,9 @@
 #!/usr/bin/env perl 
 #===============================================================================
 #
-#         FILE: createRNAprobingModel.pl
+#         FILE: RNAprobing.pl
 #
-#        USAGE: ./createRNAprobingModel.pl
+#        USAGE: ./RNAprobing.pl  
 #
 #  DESCRIPTION: 
 #
