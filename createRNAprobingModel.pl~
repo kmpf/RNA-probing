@@ -1,9 +1,9 @@
 #!/usr/bin/env perl 
 #===============================================================================
 #
-#         FILE: RNAprobing.pl
+#         FILE: createRNAprobingModel.pl
 #
-#        USAGE: ./RNAprobing.pl  
+#        USAGE: ./createRNAprobingModel.pl
 #
 #  DESCRIPTION: 
 #
@@ -56,6 +56,8 @@ my $rnaup_file = "";
 my $rdf_out = 0;
 my $owl_file ="";
 my $verbose = 0;
+my $lower_limit;
+my $upper_limit;
 
 GetOptions(
     "blastResults=s" => \$blast_result,
@@ -65,7 +67,9 @@ GetOptions(
     "rnaup=s" => \$rnaup_file,
     "rdf" => \$rdf_out,
     "owl=s"=> \$owl_file,
-    "verbose|v+" => \$verbose);
+    "verbose|v+" => \$verbose,
+    "ll" => \$lower_limit,
+    "ul" => \$upper_limit);
 
 if ( $help || $off_file eq "" || $rdat_file eq "" || $rnaup_file eq "" || $blast_result eq "" ){
     pod2usage( { -verbose => 1,
@@ -102,6 +106,8 @@ $owl_file = &checkFiles($owl_file);
 
 # creation of RDAT file object and information extraction
 my $rdat_object     = RNAprobing::RDATFile->new($rdat_file);
+
+#$rdat_object->read_rdat_file($rdat_file);
 my $rdat_filename   = fileparse($rdat_object->filename());
 my $rdat_offset     = $rdat_object->offset();
 my $rdat_reactivity = $rdat_object->reactivity();
@@ -227,6 +233,8 @@ if ( uc(join("",@match_in_off)) ne uc(join("",@match_in_rdat)) ){
 
 #  %querypos_rnaup_energies - map position to calculated rnaup energies
 my %querypos_rnaup_energies = ();
+
+#  %querypos_rnaup_pro - map position to calculated rnaup probabilities
 my %querypos_rnaup_prob = ();
 for ( my ($i, $j) = ($off_query_start, 0) ; $i <= $off_query_end; ($i++, $j++) ) {
     $querypos_rnaup_energies{$i} = $rnaup_values[$j];
@@ -234,16 +242,16 @@ for ( my ($i, $j) = ($off_query_start, 0) ; $i <= $off_query_end; ($i++, $j++) )
 }
 
 
-# %querypos_subjectpos - maps query position to subject position
+#  %rdat_seqpos_subjectpos - maps query position to subject position
 my %rdat_seqpos_subjectpos = ();
-# %subjectpos_querypos - maps subject position to query position
+#  %rdat_seqpos_querypos - maps subject position to query position
 my %rdat_seqpos_querypos = ();
 for (my ($i, $j) = ($offset_subject_start, 0); $i <= $offset_subject_end; ($i++, $j++) ) {
     $rdat_seqpos_querypos{ $i } = $off_query_start + $j;
     $rdat_seqpos_subjectpos{ $i } = $rdat_subject_start + $j;
 }
 
-# $querypos_reactivity - reference of an array with each element a hash mapping query positions to reactivity
+#  $querypos_reactivity - reference of an array with each element a hash mapping query positions to reactivity
 my $querypos_reactivity = &create_querypos_reactivity( $rdat_seqpos_reactivity, \%rdat_seqpos_querypos );
 my $querypos_reactivity_prob = &calculate_probability_from_experimental_reactivtity($querypos_reactivity);
 
@@ -252,7 +260,8 @@ if ( $csv ){
     my $csv_filename = fileparse($off_object->filename());
     $csv_filename =~ s/off$/csv/g;
     &create_csv_file( $csv_filename, \%querypos_rnaup_energies, \%querypos_rnaup_prob,
-        $querypos_reactivity, $querypos_reactivity_prob, $off_query_start, $off_query_end);
+        $querypos_reactivity, $querypos_reactivity_prob, $off_query_start, $off_query_end,
+        \@match_in_off, \@match_in_rdat );
 }
 
 
@@ -289,30 +298,36 @@ sub create_csv_file {
     my $querypos_reactivity_prob = shift;
     my $off_query_start = shift;
     my $off_query_end = shift;
+    my $match_in_off = shift; 
+    my $match_in_rdat = shift;
 
+    my $output = "";
 
-    open(CSV, ">$csv_filename") or die "Couldn't open file $csv_filename. Error: $!";
 
     # generate header line
-    print(CSV "pos,rnaup_energy,rnaup_prob");
+    $output = "pos,rnaup_energy,rnaup_prob, off_seq, rdat_seq";
     for (my $index = 0; $index < scalar(@{$querypos_reactivity} ); $index++ ) {
-        print(CSV ",reactivity_$index,reactivity_prob_$index");
+        $output .= ",reactivity_$index,reactivity_prob_$index";
     }
-    print(CSV "\n");
+    $output .= "\n";
 
     # generate the data lines
     for ( my $i = $off_query_start ; $i <= $off_query_end; $i++ ) {
-        print( CSV $i."," );
-        print( CSV $querypos_rnaup_energies->{$i}."," );
-        print( CSV $querypos_rnaup_prob->{$i}."," );
+        $output .= $i.",";
+        $output .= $querypos_rnaup_energies->{$i}.",";
+        $output .= $querypos_rnaup_prob->{$i}.",";
+        $output .= $match_in_off->[$i - 1].",";
+        $output .= $match_in_rdat->[$i - 1].",";
         for (my $j = 0; $j < scalar( @{$querypos_reactivity} ); $j++ ) {
-            print( CSV $querypos_reactivity->[$j]->{$i}.",");
-            print( CSV $querypos_reactivity_prob->[$j]->{$i});
-            print( CSV ",") if ( $j + 1 != scalar(@{$querypos_reactivity}) );
+            $output .= $querypos_reactivity->[$j]->{$i}.",";
+            $output .= $querypos_reactivity_prob->[$j]->{$i};
+            $output .= "," if ( $j + 1 != scalar(@{$querypos_reactivity}) );
         }
-        print( CSV "\n");
+        $output .= "\n";
     }
-    close(CSV);
+    open(my $csv, ">", $csv_filename) or die "Couldn't open file $csv_filename. Error: $!";
+    print($csv $output);
+    close($csv);
 }
 
 ###############################################################################
@@ -390,7 +405,11 @@ sub generate_rdf_model {
     my $owl_file = shift;
     my $logger = get_logger();
     my $rdf_filename = fileparse($off_object->filename());
+    # DL-Learner config file
+    my $conf_filename = fileparse($off_object->filename());
     $rdf_filename =~ s/off$/rdf/g;
+    $conf_filename =~ s/off$/conf/g;
+    my @positive_set = ();
 
     my $off_id = $off_object->fasta_id();
 
@@ -477,8 +496,11 @@ sub generate_rdf_model {
 
         for (my $i = 0; $i < scalar( @{$rdat_object->mutpos()} ); $i++ ) {
             next unless ( $rdat_object->mutpos()->[$i] eq "WT" );
+            my $reactivity = $querypos_reactivity_prob->[$i]->{$querypos};
             my $react_prob = $rdf->new_literal($querypos_reactivity_prob->[$i]->{$querypos}, '', 'xsd:decimal');
             $rdf->assert_literal($nuc_uri, $has_exp_unpaired_prob_uri, $react_prob);
+            print $reactivity;
+            push(@positive_set, $react_prob) if ($lower_limit < $reactivity && $$reactivity < $upper_limit);
         }
     }
 
@@ -533,6 +555,13 @@ sub generate_rdf_model {
 #    my $string = $rdf->serialize( format => 'turtle');
     $logger->info("$string");
     print $rdf_fh $string;
+    close $rdf_fh;
+
+    open (my $conf_fh, ">", $conf_filename)  or die("Can't open $conf_filename.");
+    $string = join(", ",@positive_set);
+    $logger->info("$string");
+    print $conf_fh $string;
+    close $conf_fh;
 
     return;
 }

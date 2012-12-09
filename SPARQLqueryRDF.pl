@@ -46,10 +46,12 @@ require ProbingRNA::RNAupFile;
 
 my $rdf_file = "";
 my $sparql_file = "";
+my $conf_file = "";
 
 GetOptions(
     "rdf=s" => \$rdf_file,
-    "sparql=s" => \$sparql_file);
+    "sparql=s" => \$sparql_file,
+    "conf=s" => \$conf_file);
 
 ###############################################################################
 #                 
@@ -86,12 +88,16 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
     my $parser = RDF::Trine::Parser->new( 'rdfxml' );
     $parser->parse_file_into_model( $base_uri, $rdf_file, $model );
 
-open(SPARQL_QUERY, "<$sparql_file") or die "Couldn't open file $sparql_file. Error: $!";
+open( my $sparql, "<", $sparql_file) or die "Couldn't open file $sparql_file. Error: $!";
 my $sparql_query = "";
-while (<SPARQL_QUERY>) {
+while (<$sparql>) {
     $sparql_query .= $_;
 }
+close $sarql;
 print $sparql_query;
+
+my $positive_list = "";
+
 
 if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
     # SPARQL SELECT Query
@@ -100,8 +106,9 @@ if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
     while (my $row = $iterator->next) {
       # $row is a HASHref containing variable name -> RDF Term bindings
       my @vars = keys %$row;
-      foreach my $key ( @vars){
-          print $row->{ $key }->as_string."\n";
+      foreach my $key ( @vars)
+        $positive_list .= $row->{ $key }->as_string.","; 
+        print $row->{ $key }->as_string."\n";
       }
     }
 }
@@ -112,9 +119,16 @@ if ( $sparql_query =~ /[Cc][Oo][Nn][Ss][Tt][Rr][Uu][Cc][Tt]\s/ ) {
     my $iterator = $query->execute( $model );
     while (my $st = $iterator->next) {
       # $st is a RDF::Trine::Statement object representing an RDF triple
+      $positive_list .= $st->as_string.","; 
       print $st->as_string;
-    } 
+    }
 }
+
+
+open(my $conf, ">", $conf_file) or die "Couldn't open file $sparql_file. Error: $!";
+
+close $conf;
+
 
 __END__
 

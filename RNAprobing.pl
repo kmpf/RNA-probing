@@ -22,17 +22,31 @@ use strict;
 use warnings;
 use utf8;
 use Data::Dumper;
+use File::Basename;
 use RNA;
+my $module_dir = dirname(__FILE__);
+$module_dir =~ s/scripts$/RNAprobing/g;
+push(@INC, $module_dir); 
+require RNAprobing::RDATFile;
 
 my $sample_size = 3;
 my $seq = "ACAATTTTAGCTTAATATAAAGCATCTGATTTGCGTTCAGAAGATGTGAGTGTGTCT";
 my @probing_profile = (0) x length($seq);
-
+my $rdat_file;
 
 # definition of probing reagent
 my $prob_seq = "NNN"; # specific sequence
 my $prob_str = "HHH"; # specific sec. structure
 my $prob_cut = "_|_"; # modification point
+
+my $rdat = RNAprobing::RDATFile->new($rdat_file);
+$rdat->sequence();
+$annotation{"EXPERIMENT_TYPE"} = $1     if ($word =~ /^experimentType:(\S+)/ && splice(@words, $i, 1));
+$annotation{"MODIFIER"} = $1            if ($word =~ /^modifier:(\S+)/ && splice(@words, $i, 1) );
+$annotation{"MUTATION"} = $1            if ($word =~ /^mutation:(\S+)/ && splice(@words, $i, 1) );
+push (@processings, $1)                 if ($word =~ /^processing:(\S+)/ && splice(@words, $i, 1) );
+$annotation{"TEMPERATURE"} = $1         if ($word =~ /^temperature:(\S+)/ && splice(@words, $i, 1) );
+push (@chemicals, my %chemical = ("CHEMICAL" => $1, "CHEMICAL_CONCETRATION" => $2) )
 
 
 
@@ -73,7 +87,9 @@ print(join("", @probing_profile)."\n");
 sub stochastic_sampling {
     my ($seq, $sample_size) = @_;
     # compute partition function and pair pobabilities
-    my $gfe = RNA::pf_fold($seq);
+    my $structure;
+    $RNA::st_back = 1;
+    my $gfe = RNA::pf_fold($seq, $structure);
     my @structures;
 
     for (my $i = 0; $i < $sample_size; $i++){

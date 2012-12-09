@@ -7,61 +7,70 @@ use Log::Log4perl qw(get_logger :levels);
 use Data::Dumper;
 
 sub new {
-    my ($classname, $filename) = @_;
+    my $classname = shift;
+    my $filename = shift;
     my $self = {};
+
+    &filename($self);
+    &rdat_version($self);
+    &name($self);
+    &sequence($self);
+    &structure($self);
+    &offset($self);
+    &seqpos($self);
+    &mutpos($self);
+    &annotation($self);
+    &comment($self);
+    &annotation_data($self);
+    &reactivity($self);
+    &reactivity_error($self);
+    &seqpos_reactivity_map($self);
+
+    bless( $self, $classname );
+
+
+    $self->read_rdat_file($filename) if (defined $filename);
+    return $self;
+}
+
+sub read_rdat_file {
+    my ($self, $filename) = @_;
     print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
     my $logger = get_logger();
-
-    $self->{"FILENAME"} = $filename;
-    $self->{"RDAT_VERSION"} = "";
-    $self->{"NAME"} = "";
-    $self->{"SEQUENCE"} = "";
-    $self->{"STRUCTURE"} = "";
-    $self->{"OFFSET"} = "";
-    $self->{"SEQPOS"} = [];
-    $self->{"MUTPOS"} = [];
-    $self->{"ANNOTATION"} = [];
-    $self->{"COMMENT"} = "";
-    $self->{"ANNOTATION_DATA"} = [];
-    $self->{"ANNOTATION_DATA"} = [];
-    $self->{"REACTIVITY"} = [];
-    $self->{"REACTIVITY_ERROR"} = [];
-    $self->{"SEQPOS_REACTIVITY_MAP"} = [];
+    $self->filename( $filename );
     
-    open ( my $rdat_file , "<", $self->{FILENAME} ) or croak "Couldn't open file $self->{FILENAME}. Error: $!";
+    open ( my $rdat_file , "<", $self->filename() ) or croak "Couldn't open file $self->filename(). Error: $!";
     while (my $line = <$rdat_file>) {
         chomp( $line );
-        my $string = '^#|^\s*$';
-        next if ($line =~ /$string/ );
+        my $comment = '^#|^\s*$';
+        next if ($line =~ /$comment/ );
         my @words = split(/\s+/, $line, 2);
         my @split = split( /\s+/, $words[1]);
-        $self->{"RDAT_VERSION"} = $words[1]                     if ($words[0] =~ /^RDAT_VERSION$/);
-        $self->{"NAME"} = $words[1]                             if ($words[0] =~ /^NAME$/);
-        $self->{"SEQUENCE"} = $words[1]                         if ($words[0] =~ /^SEQUENCE$/);
-        $self->{"STRUCTURE"} = $words[1]                        if ($words[0] =~ /^STRUCTURE$/);
-        $self->{"OFFSET"} = $words[1]                           if ($words[0] =~ /^OFFSET$/);
-        $self->{"SEQPOS"} = [@split]                            if ($words[0] =~ /^SEQPOS$/);
-        $self->{"MUTPOS"} = [@split]                            if ($words[0] =~ /^MUTPOS$/);
-        $self->{"ANNOTATION"} = &_parse_annotation($words[1])   if ($words[0] =~ /^ANNOTATION$/);
-        $self->{"COMMENT"} .= $words[1]." "                     if ($words[0] =~ /^COMMENT$/);
-        push(@{ $self->{"ANNOTATION_DATA"} }, 
-            &_parse_annotation($words[1]) )                     if ($words[0] =~ /^ANNOTATION_DATA:(\d+)$/);
-        push(@{ $self->{"REACTIVITY"} }, [@split])              if ($words[0] =~ /^REACTIVITY:(\d+)$/);
-        push(@{ $self->{"REACTIVITY_ERROR"} }, [@split])        if ($words[0] =~ /^REACTIVITY_ERROR:(\d+)$/);
+        $self->rdat_version( $words[1] ) if ($words[0] =~ /^RDAT_VERSION$/);
+        $self->name( $words[1] ) if ($words[0] =~ /^NAME$/);
+        $self->sequence( $words[1] ) if ($words[0] =~ /^SEQUENCE$/);
+        $self->structure( $words[1] ) if ($words[0] =~ /^STRUCTURE$/);
+        $self->offset( $words[1] ) if ($words[0] =~ /^OFFSET$/);
+        $self->seqpos( [@split] ) if ($words[0] =~ /^SEQPOS$/);
+        $self->mutpos( [@split] ) if ($words[0] =~ /^MUTPOS$/);
+        $self->annotation( $words[1] ) if ($words[0] =~ /^ANNOTATION$/);
+        $self->comment( $words[1]." " ) if ($words[0] =~ /^COMMENT$/);
+        $self->annotation_data( $words[1] ) if ($words[0] =~ /^ANNOTATION_DATA:(\d+)$/);
+        $self->reactivity( [@split] ) if ($words[0] =~ /^REACTIVITY:(\d+)$/);
+        $self->reactivity_error( [@split] ) if ($words[0] =~ /^REACTIVITY_ERROR:(\d+)$/);
         
     }
     close($rdat_file);
 
     
-    $self->{"SEQPOS_REACTIVITY_MAP"} = &_create_seqpos_reactivity_hash($self);
+    $self->{"SEQPOS_REACTIVITY_MAP"} = $self->_create_seqpos_reactivity_hash($self);
 
-    if ($self->{"RDAT_VERSION"} == 0.24 ) {
+    if ( $self->rdat_version() == 0.24 ) {
         $logger->info("Correct version.");
     } else {
         $logger->error("Incorrect Version. There may occur errors while parsing this file.");
     }
 
-    bless( $self, $classname );
     return $self;
 }
 
@@ -73,36 +82,6 @@ sub new {
 ################################################################################
 ################################################################################
 
-################################################################################
-##
-##  Subroutine that parses ANNOTATION and ANNOTATION_DATA lines
-##
-################################################################################
-
-sub _parse_annotation {
-    my ($line) = @_;
-    my %annotation = ();
-    my @chemicals = (); # array for all chemicals that have been used
-    my @processings = (); # array for all processings that have been done
-    my $logger = get_logger();
-
-    my @words = split(/\s+/, $line);
-    for (my $i = 0; $i < scalar(@words); $i++) {
-        my $word = $words[$i];
-        $annotation{"EXPERIMENT_TYPE"} = $1     if ($word =~ /^experimentType:(\S+)/ && splice(@words, $i, 1));
-        $annotation{"MODIFIER"} = $1            if ($word =~ /^modifier:(\S+)/ && splice(@words, $i, 1) );
-        $annotation{"MUTATION"} = $1            if ($word =~ /^mutation:(\S+)/ && splice(@words, $i, 1) );
-        push (@processings, $1)                 if ($word =~ /^processing:(\S+)/ && splice(@words, $i, 1) );
-        $annotation{"TEMPERATURE"} = $1         if ($word =~ /^temperature:(\S+)/ && splice(@words, $i, 1) );
-        push (@chemicals, my %chemical = ("CHEMICAL" => $1, "CHEMICAL_CONCETRATION" => $2) )
-                                                if ($word =~ /^chemical:(\S+):(\S+)/ && splice(@words, $i, 1) );
-
-    }
-    $logger->info("Undigestible rest: ". join(" ",@words) ."\n") if ( scalar(@words) != 0 );
-    $annotation{"CHEMICALS"} = [@chemicals]       if ( scalar(@chemicals) > 0 );
-    $annotation{"PROCESSING"} = [@processings]    if ( scalar(@processings) > 0 );
-    return \%annotation;
-}
 
 ################################################################################
 ##
@@ -114,16 +93,20 @@ sub _create_seqpos_reactivity_hash {
     my $self = shift;
     my @seqpos_reactivity = ();
     my $logger = get_logger();
-    for (my $j = 0; $j < scalar( @{$self->{"REACTIVITY"}} ); $j++ ) {
-        if ( scalar( @{$self->{"SEQPOS"}} ) == scalar( @{$self->{"REACTIVITY"}[$j]} ) ) {
+    my $reactivity = $self->reactivity();
+    my $seqpos = $self->seqpos();
+
+    for (my $j = 0; $j < scalar( @{$self->reactivity()} ); $j++ ) {
+        print Dumper($reactivity);
+        if ( scalar( @{$self->seqpos()} ) == scalar( @{$self->reactivity()->[$j]} ) ) {
             my %pos_reac = ();
-            for ( my $i = 0; $i < scalar(@{ $self->{"SEQPOS"} }); $i++ ) {
-                $pos_reac{ $self->{"SEQPOS"}[$i] } = $self->{"REACTIVITY"}[$j][$i];
+            for ( my $i = 0; $i < scalar(@{ $self->seqpos() }); $i++ ) {
+                $pos_reac{ $self->seqpos()->[$i] } = $self->reactivity()->[$j]->[$i];
             }
             push( @seqpos_reactivity, \%pos_reac );
         } else {
-            $logger->error("Line SEQPOS in ".$self->{"FILENAME"}." has ".scalar(@{ $self->{"SEQPOS"} })." entries.");
-            $logger->error("Line REACTIVITY in ".$self->{"FILENAME"}." has ".scalar(@{ $self->{"REACTIVITY"} })." entries.");
+            $logger->error("Line SEQPOS in ".$self->filename()." has ".scalar(@{ $self->seqpos() })." entries.");
+            $logger->error("Line REACTIVITY in ".$self->{"FILENAME"}." has ".scalar(@{ $self->reactivity() })." entries.");
             $logger->error("Both lines should have an identical number of entries.");
             $logger->error("Check your .rdat file for consistency!");
         }
@@ -142,18 +125,19 @@ sub write_rdat_file {
     my $self = shift;
     my $logger = get_logger();
     open( my $rdat_file, ">", $self->filename() ) or croak( "Couldn't open file". $self->filename() );
-    print($rdat_file, ( $self->serialize_rdat_version(),
-    $self->serialize_name(),
-    $self->serialize_sequence(),
-    $self->serialize_structure(),
-    $self->serialize_offset(),
-    $self->serialize_seqpos(),
-    $self->serialize_mutpos(),
-    $self->serialize_annotation(),
-    $self->serialize_comment(),
-    $self->serialize_annotation_data(),
-    $self->serialize_reactivity(),
-    $self->serialize_reactivity_error() ) );
+    print($rdat_file, ( 
+        $self->serialize_rdat_version(),
+        $self->serialize_name(),
+        $self->serialize_sequence(),
+        $self->serialize_structure(),
+        $self->serialize_offset(),
+        $self->serialize_seqpos(),
+        $self->serialize_mutpos(),
+        $self->serialize_annotation(),
+        $self->serialize_comment(),
+        $self->serialize_annotation_data(),
+        $self->serialize_reactivity(),
+        $self->serialize_reactivity_error() ) );
     close($rdat_file);
 }
 
@@ -165,18 +149,25 @@ sub write_rdat_file {
 
 sub filename {
     my ($self, $filename) = @_;
-    if ( defined $filename){
-        $self->{"FILENAME"} = $filename;
+    my $method_key = "FILENAME";
+    if ( defined $filename ){
+        $self->{$method_key} = $filename;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
     }
-    return $self->{"FILENAME"};
+    return $self->{$method_key}; # returns a scalar
 }
 
 sub rdat_version {
     my ($self, $rdat_version) = @_;
+    my $method_key = "RDAT_VERSION";
+    
     if ( defined $rdat_version){
-        $self->{"RDAT_VERSION"} = $rdat_version;
+        $self->{$method_key} = $rdat_version;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
     }
-    return $self->{"RDAT_VERSION"}; # returns a scalar
+    return $self->{$method_key}; # returns a scalar
 }
 
 sub serialize_rdat_version {
@@ -187,10 +178,14 @@ sub serialize_rdat_version {
 
 sub name {
     my ($self, $name) = @_;
+    my $method_key = "NAME";
+
     if ( defined $name){
-        $self->{"NAME"} = $name;
+        $self->{$method_key} = $name;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
     }
-    return $self->{"NAME"}; # returns a scalar
+    return $self->{$method_key}; # returns a scalar
 }
 
 sub serialize_name {
@@ -201,10 +196,14 @@ sub serialize_name {
 
 sub sequence {
     my ($self, $sequence) = @_;
+    my $method_key = "SEQUENCE";
+
     if ( defined $sequence){
-        $self->{"SEQUENCE"} = $sequence;
+        $self->{$method_key} = $sequence;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
     }
-    return $self->{"SEQUENCE"}; # returns a scalar
+    return $self->{$method_key}; # returns a scalar
 }
 
 sub serialize_sequence {
@@ -215,10 +214,14 @@ sub serialize_sequence {
 
 sub structure {
     my ($self, $structure) = @_;
+    my $method_key = "STRUCTURE";
+
     if ( defined $structure){
-        $self->{"STRUCTURE"} = $structure;
+        $self->{$method_key} = $structure;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
     }
-    return $self->{"STRUCTURE"}; # returns a scalar (hopefully in dot-bracket notation)
+    return $self->{$method_key}; # returns a scalar (hopefully in dot-bracket notation)
 }
 
 sub serialize_structure {
@@ -229,10 +232,14 @@ sub serialize_structure {
 
 sub offset {
     my ($self, $offset) = @_;
+    my $method_key = "OFFSET";
+
     if ( defined $offset){
-        $self->{"OFFSET"} = $offset;
+        $self->{$method_key} = $offset;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
     }
-    return $self->{"OFFSET"}; # returns a scalar
+    return $self->{$method_key}; # returns a scalar
 }
 
 sub serialize_offset {
@@ -243,10 +250,14 @@ sub serialize_offset {
 
 sub seqpos {
     my ($self, $seqpos) = @_;
+    my $method_key = "SEQPOS";
+
     if ( defined $seqpos){
-        $self->{"SEQPOS"} = $seqpos;
+        $self->{$method_key} = $seqpos;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = [];
     }
-    return $self->{"SEQPOS"}; # returns an array reference
+    return $self->{$method_key}; # returns an array reference
 }
 
 sub serialize_seqpos{
@@ -257,10 +268,14 @@ sub serialize_seqpos{
 
 sub mutpos {
     my ($self, $mutpos) = @_;
+    my $method_key = "MUTPOS";
+
     if ( defined $mutpos){
-        $self->{"MUTPOS"} = $mutpos;
+        $self->{$method_key} = $mutpos;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = [];
     }
-    return $self->{"MUTPOS"}; # returns an array reference
+    return $self->{$method_key}; # returns an array reference
 }
 
 sub serialize_mutpos{
@@ -271,10 +286,14 @@ sub serialize_mutpos{
 
 sub annotation {
     my ($self, $annotation) = @_;
+    my $method_key = "ANNOTATION";
+
     if ( defined $annotation){
-        $self->{"ANNOTATION"} = $annotation;
+        $self->{$method_key} = Annotation::new($annotation);
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = {};
     }
-    return $self->{"ANNOTATION"} ; # returns a hash reference
+    return $self->{$method_key} ; # returns a hash reference
 }
 
 sub serialize_annotation{
@@ -285,10 +304,14 @@ sub serialize_annotation{
 
 sub comment {
     my ($self, $comment) = @_;
+    my $method_key = "COMMENT";
+
     if ( defined $comment){
-        $self->{"COMMENT"} = $comment;
+        $self->{$method_key} = $comment;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
     }
-    return $self->{"COMMENT"}; # returns a scalar
+    return $self->{$method_key}; # returns a scalar
 }
 
 sub serialize_comment{
@@ -299,10 +322,15 @@ sub serialize_comment{
 
 sub annotation_data {
     my ($self, $annotation_data) = @_;
+    my $method_key = "ANNOTATION_DATA";
+
     if ( defined $annotation_data){
-        $self->{"ANNOTATION_DATA"} = $annotation_data;
+        push( @{$self->{$method_key}}, Annotation::new($annotation_data) );
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = ();
     }
-    return $self->{"ANNOTATION_DATA"}; # returns an array reference to an array of hashes
+    # returns an array reference to an array of hashes
+    return $self->{$method_key};
 }
 
 sub serialize_annotation_data{
@@ -319,10 +347,15 @@ sub serialize_annotation_data{
 
 sub reactivity {
     my ($self, $reactivity) = @_;
+    my $method_key = "REACTIVITY";
+
     if ( defined $reactivity){
-        $self->{"REACTIVITY"} = $reactivity;
+        push ( @{$self->{$method_key}}, $reactivity);
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = ();
     }
-    return $self->{"REACTIVITY"}; # returns an array reference to an array of arrays
+    # returns an array reference to an array of arrays
+    return $self->{$method_key};
 }
 
 sub serialize_reactivity{
@@ -339,10 +372,15 @@ sub serialize_reactivity{
 
 sub reactivity_error {
     my ($self, $reactivity_error) = @_;
+    my $method_key = "REACTIVITY_ERROR";
+
     if ( defined $reactivity_error){
-        $self->{"REACTIVITY_ERROR"} = $reactivity_error;
+        push( @{$self->{$method_key}}, $reactivity_error );
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = ();
     }
-    return $self->{"REACTIVITY_ERROR"}; # returns an array reference to an array of arrays
+    # returns an array reference to an array of arrays
+    return $self->{$method_key};
 }
 
 sub serialize_reactivity_error{
@@ -359,7 +397,9 @@ sub serialize_reactivity_error{
 
 sub seqpos_reactivity_map {
     my $self = shift;
-    return $self->{"SEQPOS_REACTIVITY_MAP"};
+    my $method_key = "SEQPOS_REACTIVITY_MAP";
+
+    return $self->{$method_key};
 }
 
 sub _href_to_string{
@@ -369,6 +409,12 @@ sub _href_to_string{
         $line = " ".$key.":".$href->{$key};
     }
     return $line;
+}
+
+package Annotation;
+
+sub new {
+    return "1";
 }
 
 1;
