@@ -34,32 +34,45 @@ use RDF::Query;
 use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
+use Pod::Usage;
 # load my modules
 my $module_dir = dirname(__FILE__);
 $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
-require ProbingRNA::RDATFile;
-require ProbingRNA::OFFFile;
-require ProbingRNA::BLASTresult;
-require ProbingRNA::RNAupFile;
+require RNAprobing::RDATFile;
+require RNAprobing::OFFFile;
+require RNAprobing::BLASTresult;
+require RNAprobing::RNAupFile;
 
 
 my $rdf_file = "";
 my $sparql_file = "";
 my $conf_file = "";
+my $verbose = 0;
+my $help = "";
+my $man = 0;
 
 GetOptions(
     "rdf=s" => \$rdf_file,
     "sparql=s" => \$sparql_file,
-    "conf=s" => \$conf_file);
+    "verbose|v+" => \$verbose,
+    "conf=s" => \$conf_file,
+    "help|h" => \$help,
+    "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
 
 ###############################################################################
 #                 
 # Logger initiation  
 #                 
 ###############################################################################
+my $this_file = __FILE__;
+$this_file =~ s/scripts/RNAprobing/g;
+my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
-my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
+pod2usage(-verbose => 1) && exit if ( $help );
+pod2usage(-verbose => 1) && exit if ( ($rdf_file eq "") || ($sparql_file eq "") );
+pod2usage(-verbose => 2) && exit if ( $man );
+
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
@@ -93,7 +106,7 @@ my $sparql_query = "";
 while (<$sparql>) {
     $sparql_query .= $_;
 }
-close $sarql;
+close $sparql;
 print $sparql_query;
 
 my $positive_list = "";
@@ -106,7 +119,7 @@ if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
     while (my $row = $iterator->next) {
       # $row is a HASHref containing variable name -> RDF Term bindings
       my @vars = keys %$row;
-      foreach my $key ( @vars)
+      foreach my $key ( @vars) {
         $positive_list .= $row->{ $key }->as_string.","; 
         print $row->{ $key }->as_string."\n";
       }
@@ -128,6 +141,41 @@ if ( $sparql_query =~ /[Cc][Oo][Nn][Ss][Tt][Rr][Uu][Cc][Tt]\s/ ) {
 open(my $conf, ">", $conf_file) or die "Couldn't open file $sparql_file. Error: $!";
 
 close $conf;
+
+
+
+###############################################################################
+##              
+##              Subroutine section
+##
+###############################################################################
+
+###############################################################
+##
+## &configureLogger($verbosityLevel)
+## - Configures and initialzes the Logger
+## - $verbosityLevel = scalar value that sets log level
+## -- 0 => $ERROR
+## -- 1 => $WARN
+## -- 2 => $INFO
+## -- >2 => $DEBUG
+## 
+###############################################################
+
+sub configureLogger{
+    ## Configure the logger ##
+    my $verbose = shift;
+    my $logger_name = shift;
+    my $logger = get_logger($logger_name);
+    $logger->info("Verbosity level: $verbose");
+    SELECT:{
+	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
+	    if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
+	    else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
+    }
+    return $logger;
+}
 
 
 __END__

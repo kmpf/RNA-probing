@@ -96,17 +96,17 @@ sub _create_seqpos_reactivity_hash {
     my $reactivity = $self->reactivity();
     my $seqpos = $self->seqpos();
 
-    for (my $j = 0; $j < scalar( @{$reactivity} ); $j++ ) {
+    for (my $j = 0; $j < scalar( @{$self->reactivity()} ); $j++ ) {
         print Dumper($reactivity);
-        if ( scalar( @{$seqpos} ) == scalar( @{$reactivity->[$j]} ) ) {
+        if ( scalar( @{$self->seqpos()} ) == scalar( @{$self->reactivity()->[$j]} ) ) {
             my %pos_reac = ();
-            for ( my $i = 0; $i < scalar(@{ $self->{"SEQPOS"} }); $i++ ) {
-                $pos_reac{ $self->{"SEQPOS"}[$i] } = $self->{"REACTIVITY"}[$j][$i];
+            for ( my $i = 0; $i < scalar(@{ $self->seqpos() }); $i++ ) {
+                $pos_reac{ $self->seqpos()->[$i] } = $self->reactivity()->[$j]->[$i];
             }
             push( @seqpos_reactivity, \%pos_reac );
         } else {
-            $logger->error("Line SEQPOS in ".$self->filename()." has ".scalar(@{ $self->{"SEQPOS"} })." entries.");
-            $logger->error("Line REACTIVITY in ".$self->{"FILENAME"}." has ".scalar(@{ $self->{"REACTIVITY"} })." entries.");
+            $logger->error("Line SEQPOS in ".$self->filename()." has ".scalar(@{ $self->seqpos() })." entries.");
+            $logger->error("Line REACTIVITY in ".$self->{"FILENAME"}." has ".scalar(@{ $self->reactivity() })." entries.");
             $logger->error("Both lines should have an identical number of entries.");
             $logger->error("Check your .rdat file for consistency!");
         }
@@ -411,10 +411,167 @@ sub _href_to_string{
     return $line;
 }
 
+
 package Annotation;
 
 sub new {
-    return "1";
+    my ($classname, $line) = @_;
+    my $self = {};
+
+    my @chemicals = (); # array for all chemicals that have been used
+    my @processings = (); # array for all processings that have been done
+    my $logger = get_logger();
+
+    my @words = ();
+    @words = split(/\s+/, $line) if (defined $line);
+    for (my $i = 0; $i < $#words; $i++) {
+        my $word = $words[$i];
+        &experiment_type( $self, $1 ) if ($word =~ /^experimentType:(\S+)/ && splice(@words, $i, 1));
+        &modifier( $self, $1 ) if ($word =~ /^modifier:(\S+)/ && splice(@words, $i, 1) );
+        &mutation( $self, $1 ) if ($word =~ /^mutation:(\S+)/ && splice(@words, $i, 1) );
+        push (@processings, $1)                 if ($word =~ /^processing:(\S+)/ && splice(@words, $i, 1) );
+        &temperature( $self, $1 ) if ($word =~ /^temperature:(\S+)/ && splice(@words, $i, 1) );
+        push (@chemicals, ("CHEMICAL" => $1, "CHEMICAL_CONCETRATION" => $2) )
+                                                if ($word =~ /^chemical:(\S+):(\S+)/ && splice(@words, $i, 1) );
+
+    }
+    $logger->info("Undigestible rest: ". join(" ",@words) ."\n") if ( scalar(@words) != 0 );
+    &chemicals( $self, \@chemicals ) if ( $#chemicals > 0 );
+    &processings( $self, \@processings ) if ( $#processings > 0 );
+
+    bless $self, $classname;
 }
+
+sub experiment_type {
+    my ($self, $experiment_type) = @_;
+    my $method_key = "EXPERIMENT_TYPE";
+
+    if ( defined $method_key){
+        $self->{$method_key} = $experiment_type;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
+    }
+    return $self->{$method_key}; # returns a scalar
+}
+
+sub serialize_experiment_type {
+    my $self = shift;
+    my $line = "";
+    $line = "experimentType:".$self->experiment_type()
+        unless ($self->experiment_type() eq "");
+    return $line;
+}
+
+sub modifier {
+    my ($self, $modifier) = @_;
+    my $method_key = "MODIFIER";
+
+    if ( defined $modifier){
+        $self->{$method_key} = $modifier;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
+    }
+    return $self->{$method_key}; # returns a scalar
+}
+
+sub serialize_modifier {
+    my $self = shift;
+    my $line = "";
+    $line = "modifier:".$self->modifier() unless ($self->modifier() eq "");
+    return $line;
+}
+
+sub mutation {
+    my ($self, $mutation) = @_;
+    my $method_key = "MUTATION";
+
+    if ( defined $mutation){
+        $self->{$method_key} = $mutation;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
+    }
+    return $self->{$method_key}; # returns a scalar
+}
+
+sub serialize_mutation {
+    my $self = shift;
+    my $line = "";
+    $line = "mutation:".$self->mutation() unless ($self->mutation() eq "");
+    return $line;
+}
+
+sub temperature {
+    my ($self, $temperature) = @_;
+    my $method_key = "TEMPERATURE";
+
+    if ( defined $temperature){
+        $self->{$method_key} = $temperature;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = "";
+    }
+    return $self->{$method_key}; # returns a scalar
+}
+
+sub serialize_temperature {
+    my $self = shift;
+    my $line = "";
+    $line = "temperature:".$self->temperature() unless ($self->temperature() eq "");
+    return $line;
+}
+
+sub chemicals {
+    my ($self, $chemicals) = @_;
+    my $method_key = "CHEMICALS";
+
+    if ( defined $chemicals){
+        $self->{$method_key} = $chemicals;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = {};
+    }
+    return $self->{$method_key}; # returns a hash reference
+}
+
+sub serialize_chemicals {
+    my $self = shift;
+    my $line = "";
+    foreach ( @{$self->chemicals()} ) {
+        $line .= "chemical:".$_." ";
+    }
+    return $line;
+}
+
+sub processings {
+    my ($self, $chemicals) = @_;
+    my $method_key = "CHEMICALS";
+
+    if ( defined $chemicals){
+        $self->{$method_key} = $chemicals;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = [];
+    }
+    return $self->{$method_key}; # returns a array reference
+}
+
+sub serialize_processings {
+    my $self = shift;
+    my $line = "";
+    foreach ( @{$self->chemicals()} ) {
+        $line .= "chemical:".$_." ";
+    }
+    return $line;
+}
+
+
+################################################################################
+##
+##  Subroutine that parses ANNOTATION and ANNOTATION_DATA lines
+##
+################################################################################
+
+sub _parse_annotation {
+    my ($self, $line) = @_;
+
+}
+
 
 1;

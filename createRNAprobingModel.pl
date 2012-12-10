@@ -409,29 +409,9 @@ sub generate_rdf_model {
     my $conf_filename = fileparse($off_object->filename());
     $rdf_filename =~ s/off$/rdf/g;
     $conf_filename =~ s/off$/conf/g;
-    my @positive_set = ();
+
 
     my $off_id = $off_object->fasta_id();
-
-    # Configure RDF::Helper
-    my $rdf = RDF::Helper->new(
-        BaseInterface => 'RDF::Trine',
-        namespaces => {
-            bioinf => "http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#",
-            dcterms => 'http://purl.org/dc/terms/',
-            rdfs => "http://www.w3.org/2000/01/rdf-schema#",
-            rdf => "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-            xsd => "http://www.w3.org/2001/XMLSchema#",
-            '#default' => "http://purl.org/rss/1.0/",
-            },
-        ExpandQNames => 1);
-
-    # HowTo parse a file into a model
-
-    my $parser = RDF::Trine::Parser->new( 'rdfxml' );
-    my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
-    my $model = $rdf->model();
-    $parser->parse_file_into_model( $base_uri, $owl_file, $model );
 
     # define classes
 
@@ -459,109 +439,136 @@ sub generate_rdf_model {
     my $has_glycosidic_bond_orientation_uri = 'bioinf:hasGlycosidicBondOrientation';
 
 
-    # populate the RDF graph
+    # For each elemnet in @{$rdat_object->mutpos()} create a new RDF::Helper
+    # object, to get only one experimentalUnpairedProbability per nucleotide
 
-    foreach my $querypos ( $off_query_start .. $off_query_end ) {
-        my $nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$querypos-1].$querypos;
-        $logger->debug("Nucleotide: $nuc_uri");
+    # Save a RDF::Helper objects in @rdf for each "WT" element in
+    # @{$rdat_object->mutpos()} 
+    my @rdf_models = [];
 
-        # isThreePrimeOf
+    # Configure RDF::Helper
+    for (my $i = 0; $i < scalar( @{$rdat_object->mutpos()} ); $i++ ) {
+        next if ( $rdat_object->mutpos()->[$i] ne "WT" );
+        my $rdf = RDF::Helper->new(
+            BaseInterface => 'RDF::Trine',
+            namespaces => {
+                bioinf => "http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#",
+                dcterms => 'http://purl.org/dc/terms/',
+                rdfs => "http://www.w3.org/2000/01/rdf-schema#",
+                rdf => "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+                xsd => "http://www.w3.org/2001/XMLSchema#",
+                '#default' => "http://purl.org/rss/1.0/",
+                },
+            ExpandQNames => 1);
 
-        if ( $querypos < $off_query_end ) {
-            my $three_prime_nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$querypos].($querypos+1);
-            $rdf->assert_resource($three_prime_nuc_uri, $is_three_prime_of_uri, $nuc_uri);
-        }
+        # HowTo parse a file into a model
 
-        # isFivePrimeOf
+        my $parser = RDF::Trine::Parser->new( 'rdfxml' );
+        my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
+        $parser->parse_file_into_model( $base_uri, $owl_file, $rdf->model() );
 
-        if ( $querypos > $off_query_start ) {
-            my $five_prime_nuc_uri =  'bioinf:'.$off_id.'/'.$off_seq[$querypos-2].($querypos-1);
-            $rdf->assert_resource($five_prime_nuc_uri , $is_five_prime_of_uri, $nuc_uri);
-        }
+        # populate the RDF graph
 
-        # type of nucleotide at position $querypos
+        next unless ( $rdat_object->mutpos()->[$i] eq "WT" );
 
-        $rdf->assert_resource($nuc_uri, 'rdf:type', $adenosine_uri) if ( $off_seq[$querypos-1] eq 'A');
-        $rdf->assert_resource($nuc_uri, 'rdf:type', $cytidine_uri) if ( $off_seq[$querypos-1] eq 'C');
-        $rdf->assert_resource($nuc_uri, 'rdf:type', $guanosine_uri) if ( $off_seq[$querypos-1] eq 'G');
-        $rdf->assert_resource($nuc_uri, 'rdf:type', $uridine_uri) if ( $off_seq[$querypos-1] eq 'U');
-        $rdf->assert_resource($nuc_uri, 'rdf:type', $ribonucleotide_uri) if ( $off_seq[$querypos-1] eq 'N');
+        foreach my $querypos ( $off_query_start .. $off_query_end ) {
+            my $nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$querypos-1].$querypos;
+            $logger->debug("Nucleotide: $nuc_uri");
 
-        # RNAupProbability for nucleotide at $querypos
+            # isThreePrimeOf
 
-        my $rna_up = $rdf->new_literal($querypos_rnaup_prob->{$querypos}, '', 'xsd:decimal');
-        $rdf->assert_literal($nuc_uri, $has_rnaup_unpaired_prob_uri, $rna_up);
+            if ( $querypos < $off_query_end ) {
+                my $three_prime_nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$querypos].($querypos+1);
+                $rdf->assert_resource($three_prime_nuc_uri, $is_three_prime_of_uri, $nuc_uri);
+            }
 
-        # ExperimentalUnpairedProbability for nucleotide at $querypos
+            # isFivePrimeOf
 
-        for (my $i = 0; $i < scalar( @{$rdat_object->mutpos()} ); $i++ ) {
-            next unless ( $rdat_object->mutpos()->[$i] eq "WT" );
+            if ( $querypos > $off_query_start ) {
+                my $five_prime_nuc_uri =  'bioinf:'.$off_id.'/'.$off_seq[$querypos-2].($querypos-1);
+                $rdf->assert_resource($five_prime_nuc_uri , $is_five_prime_of_uri, $nuc_uri);
+            }
+
+            # type of nucleotide at position $querypos
+
+            $rdf->assert_resource($nuc_uri, 'rdf:type', $adenosine_uri) if ( $off_seq[$querypos-1] eq 'A');
+            $rdf->assert_resource($nuc_uri, 'rdf:type', $cytidine_uri) if ( $off_seq[$querypos-1] eq 'C');
+            $rdf->assert_resource($nuc_uri, 'rdf:type', $guanosine_uri) if ( $off_seq[$querypos-1] eq 'G');
+            $rdf->assert_resource($nuc_uri, 'rdf:type', $uridine_uri) if ( $off_seq[$querypos-1] eq 'U');
+            $rdf->assert_resource($nuc_uri, 'rdf:type', $ribonucleotide_uri) if ( $off_seq[$querypos-1] eq 'N');
+
+            # RNAupProbability for nucleotide at $querypos
+
+            my $rna_up = $rdf->new_literal($querypos_rnaup_prob->{$querypos}, '', 'xsd:decimal');
+            $rdf->assert_literal($nuc_uri, $has_rnaup_unpaired_prob_uri, $rna_up);
+
+            # ExperimentalUnpairedProbability for nucleotide at $querypos
+
             my $reactivity = $querypos_reactivity_prob->[$i]->{$querypos};
             my $react_prob = $rdf->new_literal($querypos_reactivity_prob->[$i]->{$querypos}, '', 'xsd:decimal');
             $rdf->assert_literal($nuc_uri, $has_exp_unpaired_prob_uri, $react_prob);
-            print $reactivity;
-            push(@positive_set, $react_prob) if ($lower_limit < $reactivity && $$reactivity < $upper_limit);
+
+
         }
-    }
+        
+            # insert all Leontis-Westhof base pairs and tertiary interactions
 
-    # insert all Leontis-Westhof base pairs and tertiary interactions
-
-    for ( my $i = 0; $i < scalar( @{ $off_object->edges() } ); $i++) {
-        my @edge = @{$off_object->edges()->[$i]};
-        $logger->debug($edge[0]);
-        $logger->debug(scalar( @{ $off_object->edges() } ));
-        if ( $edge[0] ne "LW" ){
-            $logger->info("Unknown notation $edge[0] trying next line.");
-            next;
-        }
-        my $five_prime_nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$edge[1]-1].$edge[1];
-        my $three_prime_nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$edge[2]-1].$edge[2];
-        if ( $edge[3] =~ /^[ct!][WHST][WHST]$/ ) {
-            $edge[3] =~ /^([ct!])([WHST])([WHST])$/;
-            my $orientation = $1;
-            my $five_prime_edge = $2;
-            my $three_prime_edge = $3;
-
-            # insert TertiaryInteraction
-
-            if ( $orientation eq '!' && $five_prime_edge eq 'T' && $three_prime_edge eq 'T') {
-                $rdf->assert_resource($five_prime_nuc_uri, $has_tertiary_interaction_with_uri, $three_prime_nuc_uri );
-            } elsif ($orientation eq 'c' || $orientation eq 't' ) {
-
-                # insert Watson-Crick, Hoogsteen or Sugar edges
-
-                &insert_edge( $rdf, $five_prime_nuc_uri, $five_prime_edge );
-                &insert_edge( $rdf, $three_prime_nuc_uri, $three_prime_edge );
-                my $glycosidic_bond_orientation;
-                if ( $orientation eq "c" ){
-                    $glycosidic_bond_orientation = 'bioinf:Cis';
-                } elsif ($orientation eq "t" ){
-                    $glycosidic_bond_orientation = 'bioinf:Trans';
-                }
-                $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge, $is_paired_with_uri, $three_prime_nuc_uri.$three_prime_edge );
-                $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge, $is_paired_with_uri, $five_prime_nuc_uri.$five_prime_edge );
-                $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge, $has_glycosidic_bond_orientation_uri, $glycosidic_bond_orientation );
-                $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge, $has_glycosidic_bond_orientation_uri, $glycosidic_bond_orientation );
+        for ( my $j = 0; $j < scalar( @{ $off_object->edges() } ); $j++) {
+            my @edge = @{$off_object->edges()->[$i]};
+            if ( $edge[0] ne "LW" ){
+                $logger->info("Unknown notation $edge[0] trying next line.");
+                next;
             }
-        }
-        else {
-            $logger->error("The edge description $edge[3] can not be parsed.");
-        }
-    }
+            my $five_prime_nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$edge[1]-1].$edge[1];
+            my $three_prime_nuc_uri = 'bioinf:'.$off_id.'/'.$off_seq[$edge[2]-1].$edge[2];
+            if ( $edge[3] =~ /^[ct!][WHST][WHST]$/ ) {
+                $edge[3] =~ /^([ct!])([WHST])([WHST])$/;
+                my $orientation = $1;
+                my $five_prime_edge = $2;
+                my $three_prime_edge = $3;
 
+                # insert TertiaryInteraction
+
+                if ( $orientation eq '!' && $five_prime_edge eq 'T' && $three_prime_edge eq 'T') {
+                    $rdf->assert_resource($five_prime_nuc_uri, $has_tertiary_interaction_with_uri, $three_prime_nuc_uri );
+                } elsif ($orientation eq 'c' || $orientation eq 't' ) {
+
+                    # insert Watson-Crick, Hoogsteen or Sugar edges
+
+                    &insert_edge( $rdf, $five_prime_nuc_uri, $five_prime_edge );
+                    &insert_edge( $rdf, $three_prime_nuc_uri, $three_prime_edge );
+                    my $glycosidic_bond_orientation;
+                    if ( $orientation eq "c" ){
+                        $glycosidic_bond_orientation = 'bioinf:Cis';
+                    } elsif ($orientation eq "t" ){
+                        $glycosidic_bond_orientation = 'bioinf:Trans';
+                    }
+                    $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge, $is_paired_with_uri, $three_prime_nuc_uri.$three_prime_edge );
+                    $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge, $is_paired_with_uri, $five_prime_nuc_uri.$five_prime_edge );
+                    $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge, $has_glycosidic_bond_orientation_uri, $glycosidic_bond_orientation );
+                    $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge, $has_glycosidic_bond_orientation_uri, $glycosidic_bond_orientation );
+                }
+            }
+            else {
+                $logger->error("The edge description $edge[3] can not be parsed.");
+            }
     
-    open (my $rdf_fh, ">", $rdf_filename)  or die("Can't open $rdf_filename.");
-    my $string = $rdf->serialize( format => 'rdfxml');
-#    my $string = $rdf->serialize( format => 'turtle');
-    $logger->info("$string");
-    print $rdf_fh $string;
-    close $rdf_fh;
+        }
 
-    open (my $conf_fh, ">", $conf_filename)  or die("Can't open $conf_filename.");
-    $string = join(", ",@positive_set);
-    $logger->info("$string");
-    print $conf_fh $string;
-    close $conf_fh;
+        my $anno = $rdat_object->annotation_data()->[$i];
+        print Dumper($anno );
+        print Dumper($anno->chemicals() );
+        $rdf_filename =~ s/\.rdf/$i\.rdf/g;
+        open (my $rdf_fh, ">", $rdf_filename)  or die("Can't open $rdf_filename.");
+        my $string = $rdf->serialize( format => 'rdfxml');
+        # my $string = $rdf->serialize( format => 'turtle');
+        # $logger->info("$string");
+        print $rdf_fh $string;
+        close $rdf_fh;
+
+
+
+    }
 
     return;
 }
