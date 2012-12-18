@@ -35,6 +35,7 @@ use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
 use Pod::Usage;
+use Scalar::Util qw(blessed);
 # load my modules
 my $module_dir = dirname(__FILE__);
 $module_dir =~ s/scripts$/RNAprobing/g;
@@ -46,17 +47,17 @@ require RNAprobing::RNAupFile;
 
 
 my $rdf_file = "";
-my $sparql_file = "";
-my $conf_file = "";
+my $pos = "";
+my $neg = "";
 my $verbose = 0;
-my $help = '';
+my $help = "";
 my $man = 0;
 
 GetOptions(
     "rdf=s" => \$rdf_file,
-    "sparql=s" => \$sparql_file,
+    "pos=s" => \$pos,
+    "neg=s" => \$neg,
     "verbose|v+" => \$verbose,
-    "conf=s" => \$conf_file,
     "help|h" => \$help,
     "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
 
@@ -70,7 +71,7 @@ $this_file =~ s/scripts/RNAprobing/g;
 my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 pod2usage(-verbose => 1) && exit if ( $help );
-pod2usage(-verbose => 1) && exit if ( scalar(@files) == 0 && scalar(@directories) == 0 );
+pod2usage(-verbose => 1) && exit if ( ($rdf_file eq "") || ($pos eq "") );
 pod2usage(-verbose => 2) && exit if ( $man );
 
 
@@ -84,63 +85,91 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 
 
 
-    # Configure RDF::Helper
-    my $rdf = RDF::Helper->new (
-        BaseInterface => 'RDF::Trine',
-        namespaces => {
-            bioinf => "http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#",
-            rdfs => "http://www.w3.org/2000/01/rdf-schema#",
-            rdf => "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-            xsd => "http://www.w3.org/2001/XMLSchema#",
-            '#default' => "http://purl.org/rss/1.0/",
-            },
-        ExpandQNames => 1);
+# Configure RDF::Helper
+my $rdf = RDF::Helper->new (
+    BaseInterface => 'RDF::Trine',
+    namespaces => {
+        bioinf => "http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#",
+        rdfs => "http://www.w3.org/2000/01/rdf-schema#",
+        rdf => "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        xsd => "http://www.w3.org/2001/XMLSchema#",
+        '#default' => "http://purl.org/rss/1.0/",
+        },
+    ExpandQNames => 1);
 
-    my $model = $rdf->model();
-    my $base_uri = 'http://purl.org/rss/1.0/';
-    my $parser = RDF::Trine::Parser->new( 'rdfxml' );
-    $parser->parse_file_into_model( $base_uri, $rdf_file, $model );
+my $model = $rdf->model();
+my $base_uri = 'http://purl.org/rss/1.0/';
+my $parser = RDF::Trine::Parser->new( 'rdfxml' );
+$parser->parse_file_into_model( $base_uri, $rdf_file, $model );
 
-open( my $sparql, "<", $sparql_file) or die "Couldn't open file $sparql_file. Error: $!";
-my $sparql_query = "";
-while (<$sparql>) {
-    $sparql_query .= $_;
+my $pos_sparql_query = "";
+my $neg_sparql_query = "";
+
+open( my $sparql_fh, "<", $pos) or die "Couldn't open file $pos. Error: $!";
+while (<$sparql_fh>) {
+    $pos_sparql_query .= $_;
 }
-close $sparql;
-print $sparql_query;
+close $sparql_fh;
 
+print blessed($rdf);
+&test($rdf);
+# my $positive_list = &query_model( $pos_sparql_query, $rdf );
+# my $negative_list= &query_model( $neg_sparql_query, $rdf );
 my $positive_list = "";
+my $negative_list = "";
 
 
-if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
+if ( $pos_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
     # SPARQL SELECT Query
-    my $query = RDF::Query->new( $sparql_query );
+    my $query = RDF::Query->new( $pos_sparql_query );
     my $iterator = $query->execute( $model );
     while (my $row = $iterator->next) {
       # $row is a HASHref containing variable name -> RDF Term bindings
       my @vars = keys %$row;
       foreach my $key ( @vars) {
-        $positive_list .= $row->{ $key }->as_string.","; 
-        print $row->{ $key }->as_string."\n";
+        $positive_list .= $row->{ $key }->as_string.",";
       }
     }
 }
 
-if ( $sparql_query =~ /[Cc][Oo][Nn][Ss][Tt][Rr][Uu][Cc][Tt]\s/ ) {
-    # SPARQL CONSTRUCT/DESCRIBE Query
-    my $query = RDF::Query->new( $sparql_query );
+$positive_list =~ s/[<>]/"/g;
+
+open( my $sparql_fh, "<", $neg) or die "Couldn't open file $neg. Error: $!";
+while (<$sparql_fh>) {
+    $neg_sparql_query .= $_;
+}
+close $sparql_fh;
+
+if ( $neg_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
+    # SPARQL SELECT Query
+    my $query = RDF::Query->new( $neg_sparql_query );
     my $iterator = $query->execute( $model );
-    while (my $st = $iterator->next) {
-      # $st is a RDF::Trine::Statement object representing an RDF triple
-      $positive_list .= $st->as_string.","; 
-      print $st->as_string;
+    while (my $row = $iterator->next) {
+      # $row is a HASHref containing variable name -> RDF Term bindings
+      my @vars = keys %$row;
+      foreach my $key ( @vars) {
+        $negative_list .= $row->{ $key }->as_string.",";
+      }
     }
 }
 
 
-open(my $conf, ">", $conf_file) or die "Couldn't open file $sparql_file. Error: $!";
+my $conf_file = $rdf_file;
+my $pos_query_name = fileparse( $pos );
+$pos_query_name =~ s/\.sparql$//g;
+$conf_file =~ s/\.rdf$/\.$pos_query_name\.conf/g;
 
-close $conf;
+
+
+open(my $conf_fh, ">", $conf_file) or die "Couldn't open file $conf_file. Error: $!";
+print $conf_fh "// knowledge source
+ks.type = \"OWL File\"
+ks.fileName = \"$rdf_file\"
+lp.positiveExamples = {$positive_list}
+lp.negativeExamples = {$negative_list}
+";
+
+close $conf_fh;
 
 
 
@@ -150,7 +179,7 @@ close $conf;
 ##
 ###############################################################################
 
-###############################################################
+###############################################################################
 ##
 ## &configureLogger($verbosityLevel)
 ## - Configures and initialzes the Logger
@@ -160,7 +189,7 @@ close $conf;
 ## -- 2 => $INFO
 ## -- >2 => $DEBUG
 ## 
-###############################################################
+###############################################################################
 
 sub configureLogger{
     ## Configure the logger ##
@@ -177,6 +206,52 @@ sub configureLogger{
     return $logger;
 }
 
+###############################################################################
+##
+## &query_model($sparql_query, $model)
+## - queries $model with $sparql_query
+## 
+###############################################################################
+
+sub query_model {
+    my $sparql_query = shift;
+    my $model = shift;
+#    print Dumper($model);
+    print blessed($model);
+    my $result_list = "";
+
+    if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
+        # SPARQL SELECT Query
+        my $query = RDF::Query->new( $sparql_query );
+        my $iterator = $query->execute( $model );
+        while (my $row = $iterator->next) {
+          # $row is a HASHref containing variable name -> RDF Term bindings
+          my @vars = keys %$row;
+          foreach my $key ( @vars) {
+            $result_list .= $row->{ $key }->as_string.",";
+          }
+        }
+    }
+
+    if ( $sparql_query =~ /[Cc][Oo][Nn][Ss][Tt][Rr][Uu][Cc][Tt]\s/ ) {
+        # SPARQL CONSTRUCT/DESCRIBE Query
+        my $query = RDF::Query->new( $sparql_query );
+        my $iterator = $query->execute( $model );
+        while (my $st = $iterator->next) {
+          # $st is a RDF::Trine::Statement object representing an RDF triple
+          $positive_list .= $st->as_string.","; 
+          print $st->as_string;
+        }
+    }
+    return $result_list;
+}
+
+sub test{
+    my $model = shift;
+#    print Dumper($model);
+    print blessed($model);
+    return $model;
+}
 
 __END__
 
