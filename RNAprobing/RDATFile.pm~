@@ -5,13 +5,14 @@ use warnings;
 use Carp;
 use Log::Log4perl qw(get_logger :levels);
 use Data::Dumper;
+require RNAprobing::RDATFile::Annotation;
 
 sub new {
     my $classname = shift;
     my $filename = shift;
     my $self = {};
 
-    &filename($self);
+    &filename($self, $filename);
     &rdat_version($self);
     &name($self);
     &sequence($self);
@@ -27,7 +28,6 @@ sub new {
     &seqpos_reactivity_map($self);
 
     bless( $self, $classname );
-
 
     $self->read_rdat_file($filename) if (defined $filename);
     return $self;
@@ -82,6 +82,52 @@ sub read_rdat_file {
 ################################################################################
 ################################################################################
 
+################################################################################
+##
+##  Subroutine that reads in a RDAT file
+##
+################################################################################
+
+sub read_rdat_file {
+    my ($self, $filename) = @_;
+    print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
+    my $logger = get_logger();
+    $self->filename( $filename );
+    
+    open ( my $rdat_file , "<", $self->filename() ) or croak "Couldn't open file $self->filename(). Error: $!";
+    while (my $line = <$rdat_file>) {
+        chomp( $line );
+        my $comment = '^#|^\s*$';
+        next if ($line =~ /$comment/ );
+        my @words = split(/\s+/, $line, 2);
+        my @split = split( /\s+/, $words[1]);
+        $self->rdat_version( $words[1] ) if ($words[0] =~ /^RDAT_VERSION$/);
+        $self->name( $words[1] ) if ($words[0] =~ /^NAME$/);
+        $self->sequence( $words[1] ) if ($words[0] =~ /^SEQUENCE$/);
+        $self->structure( $words[1] ) if ($words[0] =~ /^STRUCTURE$/);
+        $self->offset( $words[1] ) if ($words[0] =~ /^OFFSET$/);
+        $self->seqpos( [@split] ) if ($words[0] =~ /^SEQPOS$/);
+        $self->mutpos( [@split] ) if ($words[0] =~ /^MUTPOS$/);
+        $self->annotation( $words[1] ) if ($words[0] =~ /^ANNOTATION$/);
+        $self->comment( $words[1]." " ) if ($words[0] =~ /^COMMENT$/);
+        $self->annotation_data( $words[1] ) if ($words[0] =~ /^ANNOTATION_DATA:(\d+)$/);
+        $self->reactivity( [@split] ) if ($words[0] =~ /^REACTIVITY:(\d+)$/);
+        $self->reactivity_error( [@split] ) if ($words[0] =~ /^REACTIVITY_ERROR:(\d+)$/);
+        
+    }
+    close($rdat_file);
+
+    
+    $self->{"SEQPOS_REACTIVITY_MAP"} = $self->_create_seqpos_reactivity_hash($self);
+
+    if ( $self->rdat_version() == 0.24 ) {
+        $logger->info("Correct version.");
+    } else {
+        $logger->error("Incorrect Version. There may occur errors while parsing this file.");
+    }
+
+    return $self;
+}
 
 ################################################################################
 ##
@@ -289,11 +335,12 @@ sub annotation {
     my $method_key = "ANNOTATION";
 
     if ( defined $annotation){
-        $self->{$method_key} = Annotation::new($annotation);
+        $self->{$method_key} = RNAprobing::RDATFile::Annotation->new($annotation);
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = {};
     }
-    return $self->{$method_key} ; # returns a hash reference
+    return $self->{$method_key} ; # returns a RNAprobing::RDATFile::Annotation
+                                  # object reference
 }
 
 sub serialize_annotation{
@@ -325,12 +372,12 @@ sub annotation_data {
     my $method_key = "ANNOTATION_DATA";
 
     if ( defined $annotation_data){
-        push( @{$self->{$method_key}}, Annotation::new($annotation_data) );
+        push( @{$self->{$method_key}}, RNAprobing::RDATFile::Annotation->new($annotation_data) );
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = ();
     }
-    # returns an array reference to an array of hashes
-    return $self->{$method_key};
+    return $self->{$method_key}; # returns a RNAprobing::RDATFile::Annotation
+                                  # object reference
 }
 
 sub serialize_annotation_data{
@@ -411,167 +458,13 @@ sub _href_to_string{
     return $line;
 }
 
-
-package Annotation;
-
-sub new {
-    my ($classname, $line) = @_;
-    my $self = {};
-
-    my @chemicals = (); # array for all chemicals that have been used
-    my @processings = (); # array for all processings that have been done
-    my $logger = get_logger();
-
-    my @words = ();
-    @words = split(/\s+/, $line) if (defined $line);
-    for (my $i = 0; $i < $#words; $i++) {
-        my $word = $words[$i];
-        &experiment_type( $self, $1 ) if ($word =~ /^experimentType:(\S+)/ && splice(@words, $i, 1));
-        &modifier( $self, $1 ) if ($word =~ /^modifier:(\S+)/ && splice(@words, $i, 1) );
-        &mutation( $self, $1 ) if ($word =~ /^mutation:(\S+)/ && splice(@words, $i, 1) );
-        push (@processings, $1)                 if ($word =~ /^processing:(\S+)/ && splice(@words, $i, 1) );
-        &temperature( $self, $1 ) if ($word =~ /^temperature:(\S+)/ && splice(@words, $i, 1) );
-        push (@chemicals, ("CHEMICAL" => $1, "CHEMICAL_CONCETRATION" => $2) )
-                                                if ($word =~ /^chemical:(\S+):(\S+)/ && splice(@words, $i, 1) );
-
-    }
-    $logger->info("Undigestible rest: ". join(" ",@words) ."\n") if ( scalar(@words) != 0 );
-    &chemicals( $self, \@chemicals ) if ( $#chemicals > 0 );
-    &processings( $self, \@processings ) if ( $#processings > 0 );
-
-    bless $self, $classname;
-}
-
-sub experiment_type {
-    my ($self, $experiment_type) = @_;
-    my $method_key = "EXPERIMENT_TYPE";
-
-    if ( defined $method_key){
-        $self->{$method_key} = $experiment_type;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
-    }
-    return $self->{$method_key}; # returns a scalar
-}
-
-sub serialize_experiment_type {
-    my $self = shift;
-    my $line = "";
-    $line = "experimentType:".$self->experiment_type()
-        unless ($self->experiment_type() eq "");
-    return $line;
-}
-
-sub modifier {
-    my ($self, $modifier) = @_;
-    my $method_key = "MODIFIER";
-
-    if ( defined $modifier){
-        $self->{$method_key} = $modifier;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
-    }
-    return $self->{$method_key}; # returns a scalar
-}
-
-sub serialize_modifier {
-    my $self = shift;
-    my $line = "";
-    $line = "modifier:".$self->modifier() unless ($self->modifier() eq "");
-    return $line;
-}
-
-sub mutation {
-    my ($self, $mutation) = @_;
-    my $method_key = "MUTATION";
-
-    if ( defined $mutation){
-        $self->{$method_key} = $mutation;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
-    }
-    return $self->{$method_key}; # returns a scalar
-}
-
-sub serialize_mutation {
-    my $self = shift;
-    my $line = "";
-    $line = "mutation:".$self->mutation() unless ($self->mutation() eq "");
-    return $line;
-}
-
-sub temperature {
-    my ($self, $temperature) = @_;
-    my $method_key = "TEMPERATURE";
-
-    if ( defined $temperature){
-        $self->{$method_key} = $temperature;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
-    }
-    return $self->{$method_key}; # returns a scalar
-}
-
-sub serialize_temperature {
-    my $self = shift;
-    my $line = "";
-    $line = "temperature:".$self->temperature() unless ($self->temperature() eq "");
-    return $line;
-}
-
-sub chemicals {
-    my ($self, $chemicals) = @_;
-    my $method_key = "CHEMICALS";
-
-    if ( defined $chemicals){
-        $self->{$method_key} = $chemicals;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = {};
-    }
-    return $self->{$method_key}; # returns a hash reference
-}
-
-sub serialize_chemicals {
-    my $self = shift;
-    my $line = "";
-    foreach ( @{$self->chemicals()} ) {
-        $line .= "chemical:".$_." ";
-    }
-    return $line;
-}
-
-sub processings {
-    my ($self, $chemicals) = @_;
-    my $method_key = "CHEMICALS";
-
-    if ( defined $chemicals){
-        $self->{$method_key} = $chemicals;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns a array reference
-}
-
-sub serialize_processings {
-    my $self = shift;
-    my $line = "";
-    foreach ( @{$self->chemicals()} ) {
-        $line .= "chemical:".$_." ";
-    }
-    return $line;
-}
-
-
 ################################################################################
-##
-##  Subroutine that parses ANNOTATION and ANNOTATION_DATA lines
-##
+#
+#                       RNAprobing::Annotation
+#
 ################################################################################
 
-sub _parse_annotation {
-    my ($self, $line) = @_;
-
-}
+#package RNAprobing::Annotation;
 
 
 1;

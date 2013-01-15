@@ -5,11 +5,12 @@ use warnings;
 use Log::Log4perl qw(get_logger :levels);
 
 sub new {
-    my $self = {};
     my $classname = shift;
+    my $filename = shift;
+    my $self = {};
     my $logger = get_logger();
 
-    $self->{"FILENAME"} = shift;
+    &filename();
     $self->{"RNAUP_COMMAND"} = "";
     $self->{"NUCLEOTIDE_POSITIONS"} = [];
     $self->{"RNAUP_VALUES"} = [];

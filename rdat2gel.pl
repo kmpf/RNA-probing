@@ -22,9 +22,6 @@
 use strict;
 use warnings;
 use utf8;
-use feature "switch";
-use lib "/homes/hubert/bin/RNAprobing";
-require RNA::RDATFile;
 use Data::Dumper;
 use File::Basename;
 use Getopt::Long;
@@ -32,6 +29,10 @@ use Image::Magick;
 use Log::Log4perl qw(get_logger :levels);
 use Pod::Usage;
 use Path::Class;
+my $module_dir = dirname(__FILE__);
+$module_dir =~ s/scripts$/RNAprobing/g;
+push(@INC, $module_dir); 
+require RNAprobing::RDATFile;
 
 ## Definition of constants used for Image::Magick
 
@@ -56,8 +57,9 @@ GetOptions(
 # Logger initiation  
 #                 
 ###############################################################################
-
-my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
+my $this_file = __FILE__;
+$this_file =~ s/scripts/RNAprobing/g;
+my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
@@ -82,7 +84,7 @@ my @rdat_files = &checkFiles(@files);
 ####### Application section #######
 my @rdat_objects = ();
 foreach my $rdat_file ( @rdat_files ) {
-    my $rdat_object = ProbingRNA::RDATFile->new($rdat_file);
+    my $rdat_object = RNAprobing::RDATFile->new($rdat_file);
     push (@rdat_objects, $rdat_object);
 
     print $rdat_object->rdat_version()."\n";   # funktioniert

@@ -42,9 +42,11 @@ my $verbose = 0;
 GetOptions(
     "help|h"    => \$help,
 # this has to be a DNA sequence so in case it's not we have to translate it
-	"database|d=s"  => \$database,  # mostly just one file containing a single sequence
-    "query|q=s" => \$query_list,         # in our case a text file that lists all .fa files to compare against the database
-                                    # this is due to the fact that its more easy for the query to be a RNA sequence the
+	"database|d=s"  => \$database,
+# mostly just one file containing a single sequence
+    "query|q=s" => \$query_list,
+# a text file that lists all .fa files to compare against the database, this is
+# due to the fact that its more easy for the query to be a RNA sequence then
     "query-directory|u=s" => \@query_directories,
     "query-file|f=s" => \@query_files,
 	"verbose|v+" => \$verbose);
@@ -89,6 +91,7 @@ if ( $query_list ) {
     close($query_list_fh);
 }
 
+# what to replace to get from RNA to DNA
 my %replace = (
     U => "T",
     u => "t"

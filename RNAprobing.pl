@@ -23,32 +23,52 @@ use warnings;
 use utf8;
 use Data::Dumper;
 use File::Basename;
+use Pod::Usage;
 use RNA;
 my $module_dir = dirname(__FILE__);
 $module_dir =~ s/scripts$/RNAprobing/g;
-push(@INC, $module_dir); 
-require RNAprobing::RDATFile;
+push(@INC, $module_dir);
+require RNAprobing;
+#require RNAprobing::Chemical;
+#require RNAprobing::RDATFile;
+#require RNAprobing::RDATFile::Annotation;
+#require RNAprobing::OFFFile;
 
-my $sample_size = 3;
-my $seq = "ACAATTTTAGCTTAATATAAAGCATCTGATTTGCGTTCAGAAGATGTGAGTGTGTCT";
+################################################################################
+#
+# Options section
+#
+################################################################################
+my $help = 0;
+my $rdat_file ="";
+my $fasta_file = "";
+my $chemical_file = "";
+my $verbose = 0;
+
+GetOptions(
+    "help|h" => \$help,
+    "fasta=s" => \$fasta_file,
+    "chemical=s" => \$chemical_file,
+    "verbose|v+" => \$verbose);
+
+if ( $help ){
+    pod2usage( { -verbose => 1,
+                 -message => "Use this script like this:\n"});
+}
+
+# Input needed is a FASTA file and a reactivity file
+my $fasta = RNAprobing::OFFFile->new($fasta_file);
+my $chemical = RNAprobing::Chemical->new($chemical_file);
+
+my $sample_size = 1000;
+my $seq = $fasta->sequence();
 my @probing_profile = (0) x length($seq);
-my $rdat_file;
+
 
 # definition of probing reagent
 my $prob_seq = "NNN"; # specific sequence
 my $prob_str = "HHH"; # specific sec. structure
 my $prob_cut = "_|_"; # modification point
-
-my $rdat = RNAprobing::RDATFile->new($rdat_file);
-$rdat->sequence();
-$annotation{"EXPERIMENT_TYPE"} = $1     if ($word =~ /^experimentType:(\S+)/ && splice(@words, $i, 1));
-$annotation{"MODIFIER"} = $1            if ($word =~ /^modifier:(\S+)/ && splice(@words, $i, 1) );
-$annotation{"MUTATION"} = $1            if ($word =~ /^mutation:(\S+)/ && splice(@words, $i, 1) );
-push (@processings, $1)                 if ($word =~ /^processing:(\S+)/ && splice(@words, $i, 1) );
-$annotation{"TEMPERATURE"} = $1         if ($word =~ /^temperature:(\S+)/ && splice(@words, $i, 1) );
-push (@chemicals, my %chemical = ("CHEMICAL" => $1, "CHEMICAL_CONCETRATION" => $2) )
-
-
 
 my @structures = &stochastic_sampling($seq, $sample_size);
 
@@ -64,9 +84,18 @@ foreach (@structures) {
 
 print(join("", @probing_profile)."\n");
 
-# (my $struct,my $mfe) = RNA::fold($seq);  #predict mfe structure of $seq
-# RNA::PS_rna_plot($seq, $struct, "rna.ps");  # write PS plot to rna.ps
-#RNA::PS_dot_plot($seq, "dot.ps");          # write dot plot to dot.ps
+$rdat_file = $fasta->fasta_id()."_".$chemical->prob_name()."rdat";
+my $rdat_out = RNAprobing::RDATFile->new($rdat_file);
+
+$rdat_out->name($fasta->fasta_id()." probed with ".$chemical->prob_name());
+$rdat_out->sequence($seq);
+my ($struct, $mfe) = RNA::fold($seq);  #predict mfe structure of $seq
+$rdat_out->structure($struct);
+$rdat_out->seqpos( ["0" .. length($seq)] );
+$rdat_out->offset("0");
+$rdat_out->reactivity(\@probing_profile);
+
+
 
 
 ################################################################################
