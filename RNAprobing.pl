@@ -34,7 +34,7 @@ push(@INC, $module_dir);
 #require RNAprobing;
 require RNAprobing::Chemical;
 require RNAprobing::RDATFile;
-    require RNAprobing::RDATFile::Annotation;
+require RNAprobing::RDATFile::Annotation;
 require RNAprobing::OFFFile;
 
 ################################################################################
@@ -89,8 +89,16 @@ my $chemical = RNAprobing::Chemical->new($chemical_file);
 my $sample_size = 10; # could be an option
 my $seq = $fasta->sequence();
 my @probing_profile = (0) x length($seq);
+my $length = length(join("", @probing_profile));
+print "Probing profile: ".join("", @probing_profile)."\n";
+print "Probing profile: ".length($seq)."\n";
+print "Probing profile length: ".scalar( @probing_profile)."\n";
 my @structures = &stochastic_sampling($seq, $sample_size);
 my @structure_description = &db2sd(@structures);
+foreach (@structure_description){
+    print( "Structure description: ".length( join("", $_) )."\n");
+}
+
 @probing_profile = &simulate_probing(\@structure_description, \@probing_profile,
                                      $seq, $chemical);
 
@@ -98,8 +106,8 @@ my @structure_description = &db2sd(@structures);
 # Should be logged instead of printed
 
 print("=== Results ===\n");
-foreach (@structures) {
-    print("$_\n");
+for (my $i = 0; $i < $#structures; $i++) {
+    print("$i. Structure:\n$structures[$i]\n$structure_description[$i]\n");
 }
 print(join("", @probing_profile)."\n");
 
@@ -111,10 +119,13 @@ my $rdat_out = RNAprobing::RDATFile->new($rdat_file);
 
 $rdat_out->name($fasta->fasta_id()." probed with ".$chemical->probe_name());
 $rdat_out->sequence($seq);
-my ($struct, $mfe) = RNA::fold($seq);  #predict mfe structure of $seq
+my ($struct, $mfe) = RNA::fold($seq);  # predict mfe structure of $seq
 $rdat_out->structure($struct);
 $rdat_out->offset("0");
-$rdat_out->seqpos( ["0" .. length($seq)] );
+$rdat_out->seqpos( ["1" .. (length($seq))] );
+$length = length(join("", @probing_profile));
+print "Probing profile: ".join("", @probing_profile)."\n";
+print "Probing profile: ".length($seq)."\n";
 $rdat_out->reactivity(\@probing_profile);
 #    &mutpos($self);
 #    &annotation($self);
@@ -232,8 +243,7 @@ foreach (@structures) {
                     $enclosed_stems++;
                 }
             }
-           print("Enclosed unpaired nucleotides: "
-                    .join(",", @enclosed_dots)."\n");
+#           print("Enclosed unpaired nucleotides: "                    .join(",", @enclosed_dots)."\n");
 
             # Hairpin or bulge detected
             if ( $enclosed_stems == 0 ) {
@@ -242,13 +252,13 @@ foreach (@structures) {
                 if ($op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] &&
                     $cl_br_pos - 1 == $enclosed_dots[0] ) {            
                     foreach (@enclosed_dots) { $struc_dec[$_] = "H" }
-                    print("Hairpin found.\n");
+#                    print("Hairpin found.\n");
                 }
                 # bulge detected if the enclosed dots just touch one bracket
                 elsif ( $op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] ||
                         $cl_br_pos - 1 == $enclosed_dots[0] ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "B" }
-                    print("Bulge found.\n");
+#                    print("Bulge found.\n");
                 }
             }
             # Multi loop with two included stems or an interior loop detected
@@ -258,20 +268,20 @@ foreach (@structures) {
                 if ($op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] &&
                     $cl_br_pos - 1 == $enclosed_dots[0] ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "I" }
-                    print("Interior loop found.\n");
+#                    print("Interior loop found.\n");
                 }
                 # Multi loop with two stems detected if the enclosed dots just
                 # touch one bracket
                 elsif ( $op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] ||
                         $cl_br_pos - 1 == $enclosed_dots[0] ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "M" }
-                    print("Multi loop found.\n");
+#                    print("Multi loop found.\n");
                 }
             }
             # Multi loop detected if more than one stem is enclosed
             elsif( $enclosed_stems > 1 ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "M" }
-                    print("Multi loop found.\n");
+#                    print("Multi loop found.\n");
             }
         }
         # No enclosed unpaired nucleotides so lets declare the base pair
@@ -282,7 +292,7 @@ foreach (@structures) {
         }
     }
     my $str_desc = join("",@struc_dec);
-    print("$_\n$str_desc\n");
+#    print("$_\n$str_desc\n");
     push(@structure_description, join("",@struc_dec));
 }
 return @structure_description;
@@ -308,7 +318,8 @@ sub simulate_probing {
         $prob_seq =~ s/N/[ACGTU]/g;
 
         # create regex from probing structure
-        $prob_str = s/U/[HBIMU]/g;
+        $prob_str =~ s/U/[HBIMn]/g;
+        $prob_str =~ s/n/U/g;
 
         foreach my $str_desc (@{$structure_description}) {
             # Find the modification/cut point
@@ -323,13 +334,13 @@ sub simulate_probing {
             if ($#seq_matches > $#str_matches) {
                 my $more_matches = join(",",@seq_matches);
                 foreach (@str_matches) {
-                    ${probing_profile}[$_]++ if ($more_matches =~ /,$_,/);
+                    ${probing_profile}[$_] += $prob_reac if ($more_matches =~ /,$_,/);
                 }
             }
             else {
                  my $more_matches = join(",",@str_matches);
                 foreach (@seq_matches) {
-                    ${probing_profile}[$_]++  if ($more_matches =~ /,$_,/);
+                    ${probing_profile}[$_] += $prob_reac  if ($more_matches =~ /,$_,/);
                 }
             }
 

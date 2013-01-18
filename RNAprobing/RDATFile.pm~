@@ -112,7 +112,7 @@ sub write_rdat_file {
         $self->serialize_reactivity().
         $self->serialize_reactivity_error();
     open( my $rdat_file, ">", $self->filename() ) or croak( "Couldn't open file". $self->filename() );
-    print($rdat_file,  $file_content);
+    print($rdat_file  $file_content);
     close($rdat_file);
     $logger->info($file_content);
 }
@@ -380,11 +380,13 @@ sub serialize_reactivity_error{
 
 sub seqpos_reactivity_map {
     my ($self, $seqpos, $reactivity) = @_;
-    my $method_key = "SEQPOS_REACTIVITY_ERROR";
+    my $method_key = "SEQPOS_REACTIVITY_MAP";
 
     if ( defined $reactivity && defined $seqpos ){
-        push( @{$self->{$method_key}}, 
-            $self->_create_seqpos_reactivity_hash($seqpos, $reactivity) );
+        foreach my $reac_entry ( @{$reactivity}){
+            push( @{$self->{$method_key}}, 
+                $self->_create_seqpos_reactivity_hash($seqpos, $reac_entry) );
+        }
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
@@ -399,28 +401,25 @@ sub seqpos_reactivity_map {
 ################################################################################
 
 sub _create_seqpos_reactivity_hash {
-    my ($self, $seqpos, $reactivity) = (@_);
+    my ($self, $seqpos, $reac_entry) = (@_);
     my @seqpos_reactivity = ();
     my $logger = get_logger();
+    my %pos_reac = ();
 
-    if (defined $reactivity && defined $seqpos ){
-        for (my $j = 0; $j < scalar( @{$reactivity} ); $j++ ) {
-            print Dumper($reactivity);
-            if ( scalar( @{$seqpos} ) == scalar( @{$reactivity->[$j]} ) ) {
-                my %pos_reac = ();
-                for ( my $i = 0; $i < scalar( @{$seqpos} ); $i++ ) {
-                    $pos_reac{ $seqpos->[$i] } = $reactivity->[$j]->[$i];
-                }
-                push( @seqpos_reactivity, \%pos_reac );
-            } else {
-                $logger->error("Line SEQPOS in ".$self->filename()." has ".scalar(@{ $seqpos })." entries.");
-                $logger->error("Line REACTIVITY in ".$self->filename()." has ".scalar(@{ $reactivity })." entries.");
-                $logger->error("Both lines should have an identical number of entries.");
-                $logger->error("Check your .rdat file for consistency!");
+    if (defined $reac_entry && defined $seqpos ){
+        print Dumper($reac_entry);
+        if ( scalar( @{$seqpos} ) == scalar( @{$reac_entry} ) ) {
+            for ( my $i = 0; $i < scalar( @{$seqpos} ); $i++ ) {
+                $pos_reac{ $seqpos->[$i] } = $reac_entry->[$i];
             }
+        } else {
+            $logger->error("Line SEQPOS in ".$self->filename()." has ".scalar(@{ $seqpos })." entries.");
+            $logger->error("Line REACTIVITY in ".$self->filename()." has ".scalar(@{ $reactivity })." entries.");
+            $logger->error("Both lines should have an identical number of entries.");
+            $logger->error("Check your .rdat file for consistency!");
         }
     }
-    return \@seqpos_reactivity;
+    return \%pos_reac;
 }
 
 sub _href_to_string{
