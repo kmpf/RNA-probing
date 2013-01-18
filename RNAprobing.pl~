@@ -21,17 +21,21 @@
 use strict;
 use warnings;
 use utf8;
+use Getopt::Long;
 use Data::Dumper;
 use File::Basename;
+use Log::Log4perl qw(get_logger :levels);
+use Path::Class;
+use Pod::Usage;
 use RNA;
 my $module_dir = dirname(__FILE__);
 $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
-require RNAprobing;
-#require RNAprobing::Chemical;
-#require RNAprobing::RDATFile;
-#require RNAprobing::RDATFile::Annotation;
-#require RNAprobing::OFFFile;
+#require RNAprobing;
+require RNAprobing::Chemical;
+require RNAprobing::RDATFile;
+    require RNAprobing::RDATFile::Annotation;
+require RNAprobing::OFFFile;
 
 ################################################################################
 #
@@ -55,47 +59,70 @@ if ( $help ){
                  -message => "Use this script like this:\n"});
 }
 
+###############################################################################
+#                 
+# Logger initiation  
+#                 
+###############################################################################
+my $this_file = __FILE__;
+$this_file =~ s/scripts/RNAprobing/g;
+my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
+
+# Apply configuration to the logger
+Log::Log4perl->init("$log4perl_conf");
+
+# Get the logger
+my $logger_name = "RNAprobing";
+my $logger = &configureLogger($verbose, $logger_name);
+$logger->info("++++ ".__FILE__." has been started. ++++");
+
+###############################################################################
+#                 
+# Program logic
+#                 
+###############################################################################
+
 # Input needed is a FASTA file and a reactivity file
 my $fasta = RNAprobing::OFFFile->new($fasta_file);
 my $chemical = RNAprobing::Chemical->new($chemical_file);
 
-my $sample_size = 1000;
+my $sample_size = 10; # could be an option
 my $seq = $fasta->sequence();
 my @probing_profile = (0) x length($seq);
-
-
-# definition of probing reagent
-my $prob_seq = "NNN"; # specific sequence
-my $prob_str = "HHH"; # specific sec. structure
-my $prob_cut = "_|_"; # modification point
-
 my @structures = &stochastic_sampling($seq, $sample_size);
-
 my @structure_description = &db2sd(@structures);
-
 @probing_profile = &simulate_probing(\@structure_description, \@probing_profile,
-                                     $seq, $prob_seq, $prob_str, $prob_cut);
+                                     $seq, $chemical);
+
+# === Result output ===
+# Should be logged instead of printed
 
 print("=== Results ===\n");
 foreach (@structures) {
     print("$_\n");
 }
-
 print(join("", @probing_profile)."\n");
 
-$rdat_file = $fasta->fasta_id()."_".$chemical->prob_name()."rdat";
+# === Assemble a RDAT file ===
+
+$rdat_file = $fasta->fasta_id()."_".$chemical->probe_name().".rdat";
+$logger->info("++++ ".$rdat_file." ++++");
 my $rdat_out = RNAprobing::RDATFile->new($rdat_file);
 
-$rdat_out->name($fasta->fasta_id()." probed with ".$chemical->prob_name());
+$rdat_out->name($fasta->fasta_id()." probed with ".$chemical->probe_name());
 $rdat_out->sequence($seq);
 my ($struct, $mfe) = RNA::fold($seq);  #predict mfe structure of $seq
 $rdat_out->structure($struct);
-$rdat_out->seqpos( ["0" .. length($seq)] );
 $rdat_out->offset("0");
+$rdat_out->seqpos( ["0" .. length($seq)] );
 $rdat_out->reactivity(\@probing_profile);
+#    &mutpos($self);
+#    &annotation($self);
+#    &comment($self);
+#    &annotation_data($self);
+#    &reactivity_error($self);
 
-
-
+$rdat_out->write_rdat_file();
 
 ################################################################################
 ################################################################################
@@ -105,6 +132,33 @@ $rdat_out->reactivity(\@probing_profile);
 ################################################################################
 ################################################################################
 
+###############################################################
+##
+## &configureLogger($verbosityLevel)
+## - Configures and initialzes the Logger
+## - $verbosityLevel = scalar value that sets log level
+## -- 0 => $ERROR
+## -- 1 => $WARN
+## -- 2 => $INFO
+## -- >2 => $DEBUG
+## 
+###############################################################
+
+sub configureLogger{
+    ## Configure the logger ##
+    my $verbose = shift;
+    my $logger_name = shift;
+    my $logger = get_logger($logger_name);
+    $logger->info("Verbosity level: $verbose");
+    # print Dumper($logger);
+    SELECT:{
+	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
+	    if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
+	    else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
+    }
+    return $logger;
+}
 
 ################################################################################
 #
@@ -123,9 +177,6 @@ sub stochastic_sampling {
     for (my $i = 0; $i < $sample_size; $i++){
         push( @structures, RNA::pbacktrack($seq) );
     }
-
-# @structures = ();
-# $structures[0] = "...(((..(((.((...))))).(((...)))..((..((...))..))..)))...";
 
     return @structures;
 }
@@ -245,35 +296,46 @@ return @structure_description;
 ################################################################################
 
 sub simulate_probing {
-    my ($str, $probing_profile, $seq, $prob_seq, $prob_str, $prob_cut) = @_;
+    my ($structure_description, $probing_profile, $seq, $chemical) = @_;
 
-    foreach my $str_desc (@{$str}) {
-        # Find the modification/cut point
-        $prob_cut =~ /\|/;
-        my $cut_pos = $-[0];
+    for ( my $i = 0; $i < scalar(@{$chemical->probe_reac()}); $i++ ) {
+        my $prob_reac = ${$chemical->probe_reac()}[$i];
+        my $prob_seq = ${$chemical->probe_seq()}[$i];
+        my $prob_str = ${$chemical->probe_str()}[$i];
+        my $prob_cut = ${$chemical->probe_cut()}[$i];
 
-        # create regex from sequence
+        # create regex from probing sequence
         $prob_seq =~ s/N/[ACGTU]/g;
 
-        my @seq_matches = &match_all_positions($prob_seq, $seq, $cut_pos);
-        my @str_matches = &match_all_positions($prob_str, $str_desc, $cut_pos);
+        # create regex from probing structure
+        $prob_str = s/U/[HBIMU]/g;
+
+        foreach my $str_desc (@{$structure_description}) {
+            # Find the modification/cut point
+            $prob_cut =~ /\|/;
+            my $cut_pos = $-[0];
 
 
-        if ($#seq_matches > $#str_matches) {
-            my $more_matches = join(",",@seq_matches);
-            foreach (@str_matches) {
-                ${probing_profile}[$_]++ if ($more_matches =~ /,$_,/);
+            my @seq_matches = &match_all_positions($prob_seq, $seq, $cut_pos);
+            my @str_matches = &match_all_positions($prob_str, $str_desc, $cut_pos);
+
+
+            if ($#seq_matches > $#str_matches) {
+                my $more_matches = join(",",@seq_matches);
+                foreach (@str_matches) {
+                    ${probing_profile}[$_]++ if ($more_matches =~ /,$_,/);
+                }
             }
-        }
-        else {
-             my $more_matches = join(",",@str_matches);
-            foreach (@seq_matches) {
-                ${probing_profile}[$_]++  if ($more_matches =~ /,$_,/);
+            else {
+                 my $more_matches = join(",",@str_matches);
+                foreach (@seq_matches) {
+                    ${probing_profile}[$_]++  if ($more_matches =~ /,$_,/);
+                }
             }
-        }
 
-#        print(join("",@{$probing_profile})."\n");
-#        print("$seq\n");
+    #        print(join("",@{$probing_profile})."\n");
+    #        print("$seq\n");
+        }
     }
     return @{$probing_profile};
 }

@@ -20,7 +20,7 @@ sub new {
     &edges($self);
  
     bless( $self, $classname );
-    $self->read_file($filename) if ( defined $filename );
+    $self->read_file($filename) if ( defined $filename && -e $filename );
     return $self;
 }
 
@@ -167,8 +167,8 @@ sub structure {
 sub column_sizes {
     my ($self, $column_sizes) = @_;
     my $method_key = "COLUMN_SIZES";
-    if ( defined $fasta_id ){
-        $self->{$method_key} = $fasta_id;
+    if ( defined $column_sizes ){
+        $self->{$method_key} = $column_sizes;
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
