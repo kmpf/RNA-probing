@@ -106,7 +106,7 @@ foreach (@structure_description){
 # Should be logged instead of printed
 
 print("=== Results ===\n");
-for (my $i = 0; $i <= $#structures; $i++) {
+for (my $i = 0; $i < scalar(@structures); $i++) {
     print("$i. Structure:\n$structures[$i]\n$structure_description[$i]\n");
 }
 print(join("", @probing_profile)."\n");
@@ -211,12 +211,13 @@ foreach (@structures) {
     my @struc_dec = ("U") x length($_);
 
     # fill arrays with positions
-    for (my $i = 0; $i < $#db; $i++) {
+    for (my $i = 0; $i < scalar(@db); $i++) {
         push(@dots, $i) if ( $db[$i] eq "." );
         push(@opening_br, $i) if ( $db[$i] eq "(" );
 
         # closing bracket found, so lets classify enclosed unpaired nucleotides
         # if there are any
+        # if clause leads to errors, if @db contains substrings like "()"
         if ( $db[$i] eq ")" && $dots[$#dots] > $opening_br[$#opening_br] ) {
 
             # declare enclosing bracket positions
@@ -330,7 +331,7 @@ sub simulate_probing {
             my @str_matches = &match_all_positions($prob_str, $str_desc, $cut_pos);
 
 
-            if ($#seq_matches > $#str_matches) {
+            if (scalar(@seq_matches) > scalar(@str_matches) ) {
                 my $more_matches = join(",",@seq_matches);
                 foreach (@str_matches) {
                     ${probing_profile}[$_] += $prob_reac if ($more_matches =~ /,$_,/);
