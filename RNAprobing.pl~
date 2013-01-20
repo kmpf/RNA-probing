@@ -86,17 +86,17 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 my $fasta = RNAprobing::OFFFile->new($fasta_file);
 my $chemical = RNAprobing::Chemical->new($chemical_file);
 
-my $sample_size = 10; # could be an option
+my $sample_size = 2; # could be an option
 my $seq = $fasta->sequence();
 my @probing_profile = (0) x length($seq);
 my $length = length(join("", @probing_profile));
-print "Probing profile: ".join("", @probing_profile)."\n";
-print "Probing profile: ".length($seq)."\n";
-print "Probing profile length: ".scalar( @probing_profile)."\n";
 my @structures = &stochastic_sampling($seq, $sample_size);
 my @structure_description = &db2sd(@structures);
+foreach (@structures){
+    print( "Structure: ".$_."\n");
+}
 foreach (@structure_description){
-    print( "Structure description: ".length( join("", $_) )."\n");
+    print( "Structure description: ".$_."\n");
 }
 
 @probing_profile = &simulate_probing(\@structure_description, \@probing_profile,
@@ -121,11 +121,9 @@ $rdat_out->name($fasta->fasta_id()." probed with ".$chemical->probe_name());
 $rdat_out->sequence($seq);
 my ($struct, $mfe) = RNA::fold($seq);  # predict mfe structure of $seq
 $rdat_out->structure($struct);
-$rdat_out->offset("0");
-$rdat_out->seqpos( ["1" .. (length($seq))] );
-$length = length(join("", @probing_profile));
-print "Probing profile: ".join("", @probing_profile)."\n";
-print "Probing profile: ".length($seq)."\n";
+$rdat_out->offset(0);
+my @seqpos = (1 .. length($seq));
+$rdat_out->seqpos( \@seqpos );
 $rdat_out->reactivity(\@probing_profile);
 #    &mutpos($self);
 #    &annotation($self);
@@ -206,7 +204,8 @@ foreach (@structures) {
 
     my @db = split('', $_);
 
-    my (@dots, @opening_br, @closing_br) = ();
+    my @dots = (-1);
+    my @opening_br = (-1);
 
     # at first we expect every nucleotide to be unpaired "U"
     my @struc_dec = ("U") x length($_);
@@ -318,7 +317,8 @@ sub simulate_probing {
         $prob_seq =~ s/N/[ACGTU]/g;
 
         # create regex from probing structure
-        $prob_str = s/U/[HBIM]/g;
+        $prob_str =~ s/U/[HBIMn]/g;
+        $prob_str =~ s/n/U/g;
 
         foreach my $str_desc (@{$structure_description}) {
             # Find the modification/cut point

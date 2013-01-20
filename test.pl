@@ -40,12 +40,14 @@ $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
 require RNAprobing::RDATFile;
 require RNAprobing::OFFFile;
-require RNAprobing::BLASTresult;
+#require RNAprobing::BLASTresult;
 require RNAprobing::RNAupFile;
 
-
-my $rdat_file = "5SRRNA_SHP_0001_3.rdat";
-my $rdat_object = RNAprobing::RDATFile->new($rdat_file);
+ 
+my (@eins, @zwei, @drei) = (0, 0, 0), (1), (2);
+print '@eins: '.join("|", @eins)."\n";
+print '@zwei: '.join("|", @zwei)."\n";
+print '@drei: '.join("|", @drei)."\n";
 
 
 # 

@@ -402,7 +402,7 @@ sub seqpos_reactivity_map {
 
 sub _create_seqpos_reactivity_hash {
     my ($self, $seqpos, $reac_entry) = (@_);
-    my @seqpos_reactivity = ();
+#    my @seqpos_reactivity = ();
     my $logger = get_logger();
     my %pos_reac = ();
 
@@ -414,7 +414,7 @@ sub _create_seqpos_reactivity_hash {
             }
         } else {
             $logger->error("Line SEQPOS in ".$self->filename()." has ".scalar(@{ $seqpos })." entries.");
-            $logger->error("Line REACTIVITY in ".$self->filename()." has ".scalar(@{ $reactivity })." entries.");
+            $logger->error("Line REACTIVITY in ".$self->filename()." has ".scalar(@{ $reac_entry })." entries.");
             $logger->error("Both lines should have an identical number of entries.");
             $logger->error("Check your .rdat file for consistency!");
         }

@@ -29,7 +29,7 @@ sub new {
 
     bless( $self, $classname );
 
-    $self->read_rdat_file($filename) if (defined $filename && -e $filename);
+#    $self->read_rdat_file($filename) if (defined $filename && -e $filename);
     return $self;
 }
 
@@ -402,7 +402,7 @@ sub seqpos_reactivity_map {
 
 sub _create_seqpos_reactivity_hash {
     my ($self, $seqpos, $reac_entry) = (@_);
-    my @seqpos_reactivity = ();
+#    my @seqpos_reactivity = ();
     my $logger = get_logger();
     my %pos_reac = ();
 
