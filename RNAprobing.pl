@@ -131,7 +131,7 @@ $rdat_out->reactivity(\@probing_profile);
 #    &annotation_data($self);
 #    &reactivity_error($self);
 
-$rdat_out->write_rdat_file();
+$rdat_out->write_file();
 
 ################################################################################
 ################################################################################

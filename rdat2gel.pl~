@@ -33,7 +33,6 @@ my $module_dir = dirname(__FILE__);
 $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
 require RNAprobing::RDATFile;
-#require RNAprobing::RDATFile::Annotation;
 
 ## Definition of constants used for Image::Magick
 
@@ -72,48 +71,26 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 
 
 my @rdat_files = &checkFiles(@files);
-# my @gel_files = ();
-# foreach my $rdat_file ( @rdat_files ) {
-#     if ($rdat_file =~ /rdat$/) {
-#         $rdat_file =~ /(*)rdat$/$1/;
-#         push(@gel_files, $rdat_file);
-#     }
-# 
-# }
-
 
 ####### Application section #######
 my @rdat_objects = ();
 foreach my $rdat_file ( @rdat_files ) {
-    my $rdat_object = RNAprobing::RDATFile->new($rdat_file);
+    my $rdat_object = RNAprobing::RDATFile->new();
+    $rdat_object->read_file($rdat_file);
     push (@rdat_objects, $rdat_object);
 
-    print $rdat_object->rdat_version()."\n";   # funktioniert
-    print $rdat_object->name()."\n";           # funktioniert
-    print $rdat_object->sequence()."\n";       # funktioniert
-    print $rdat_object->structure()."\n";      # funktioniert
-    print $rdat_object->offset()."\n";         # funktioniert
-    print join(" ", @{ $rdat_object->seqpos()})."\n";  # funktioniert
-    print join(" ", @{ $rdat_object->mutpos()})."\n";  # funktioniert
-    
-    my $annotation = $rdat_object->annotation();
-    foreach my $key (keys %{ $annotation } ) {
-        print $key.":".$annotation->{$key}."\n";
-    }
-    print $rdat_object->comment()."\n";
-    
-    my $annotation_data = $rdat_object->annotation_data();
-    for (my $i = 0; $i < scalar( @{ $annotation_data } ); $i++ ) {
-        foreach my $key (keys %{ $annotation_data->[$i]}){
-            print $key.":".$annotation_data->[$i]->{$key}."|".ref(\$annotation_data->[$i]->{$key})."\n";
-        }
-    }
-    foreach my $aref ($rdat_object->reactivity()) {
-        print join( " ", @$aref )."\n";
-    }
-    my $reactivity_error = $rdat_object->reactivity_error();
-    print "reactivity_error:";
-    print join( " ",  @{ $reactivity_error->[0]} )."\n";
+    print $rdat_object->serialize_rdat_version()."\n";   # funktioniert
+    print $rdat_object->serialize_name()."\n";           # funktioniert
+    print $rdat_object->serialize_sequence()."\n";       # funktioniert
+    print $rdat_object->serialize_structure()."\n";      # funktioniert
+    print $rdat_object->serialize_offset()."\n";         # funktioniert
+    print $rdat_object->serialize_seqpos()."\n";  # funktioniert
+    print $rdat_object->serialize_mutpos()."\n";  # funktioniert
+    print $rdat_object->serialize_annotation()."\n";
+    print $rdat_object->serialize_comment()."\n";
+    print $rdat_object->serialize_annotation_data()."\n";
+    print $rdat_object->serialize_reactivity()."\n";
+    print $rdat_object->serialize_reactivity_error()."\n";
 
     &make_gel($rdat_object);
 
@@ -194,8 +171,8 @@ sub make_gel {
     my $sequence = $rdat_object->sequence();
     my $offset = $rdat_object->offset();
     my @seq_pos = @{ $rdat_object->seqpos() };
-    my @reactivity = @{ $rdat_object->reactivity() };
-
+    my $reactivity = $rdat_object->scaled_reactivity() ;
+    print '@reactivity: '.Dumper($reactivity)."\n";
     # log what we know
     $logger->info("Sequence length: ".length($sequence));
     $logger->info("Offset: ".$offset);
@@ -205,26 +182,32 @@ sub make_gel {
     my $gel = Image::Magick->new;
     my $lane = Image::Magick->new;
     my $band = Image::Magick->new(size => $BAND_WIDTH."x".$BAND_HEIGHT);
-    for ( my $j = 0; $j < scalar(@reactivity); $j++ ) {
+    for ( my $j = 0; $j < scalar(@{ $reactivity}); $j++ ) {
         $logger->info("Lane number: ".$j);
-        $logger->info("# of reactivties for lane $j: ". scalar( @{ $reactivity[$j]} ));
-        my @lane_reactivities = @{ $reactivity[$j]};
+        $logger->info("# of reactivties for lane $j: ". scalar( @{ $reactivity}[$j] ));
+        my $lane_reactivities = ${reactivity}[$j];
+        print '@{$lane_reactivities}: '.Dumper(@{$lane_reactivities})."\n";
 
-
-        for ( my $i = 0; $i < scalar(@lane_reactivities); $i++ ){
+        for ( my $i = 0; $i < scalar(@{$lane_reactivities}); $i++ ){
             my ($nucleotide, $colour, $nuc_reactivity, $perlmagick_error);
 
             if ( $labeled_end == 5 ) {
                 $nucleotide = $i;
             } elsif ( $labeled_end == 3 ){
-                $nucleotide = scalar(@lane_reactivities) - $i;
+                $nucleotide = scalar(@{$lane_reactivities}) - $i;
             } else {
                 $logger->error("Value $labeled_end not allowed for option \"-labeled-end\".") && exit;
             }
 
-            $nuc_reactivity = $lane_reactivities[$nucleotide];
-            $nuc_reactivity = 0 if ($nuc_reactivity < 0 );
-            $nuc_reactivity = 1 if ($nuc_reactivity > 1 );
+            $nuc_reactivity = $lane_reactivities->[$nucleotide];
+            if ($nuc_reactivity < 0 ) {
+                $nuc_reactivity = 0;
+                $logger->error("There is a nucleotide with reactivity < 0");
+            }
+            if ($nuc_reactivity > 1 ) {
+                $nuc_reactivity = 1;
+                $logger->error("There is a nucleotide with reactivity > 1");
+            }
             $colour = sprintf("%d", 255 * (1 - $nuc_reactivity) );
             $logger->info("RGB of Nucleotide $nucleotide is rgb($colour, $colour, $colour)");
 

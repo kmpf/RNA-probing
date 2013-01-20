@@ -106,7 +106,7 @@ foreach (@structure_description){
 # Should be logged instead of printed
 
 print("=== Results ===\n");
-for (my $i = 0; $i <= $#structures; $i++) {
+for (my $i = 0; $i < scalar(@structures); $i++) {
     print("$i. Structure:\n$structures[$i]\n$structure_description[$i]\n");
 }
 print(join("", @probing_profile)."\n");

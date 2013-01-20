@@ -3,6 +3,7 @@ package RNAprobing::RDATFile;
 use strict;
 use warnings;
 use Carp;
+use List::Util qw(first max maxstr min minstr reduce shuffle sum);
 use Log::Log4perl qw(get_logger :levels);
 use Data::Dumper;
 require RNAprobing::RDATFile::Annotation;
@@ -26,10 +27,11 @@ sub new {
     &reactivity($self);
     &reactivity_error($self);
     &seqpos_reactivity_map($self);
+    &scaled_reactivity($self);
 
     bless( $self, $classname );
 
-    $self->read_rdat_file($filename) if (defined $filename && -e $filename);
+#    $self->read_file($filename) if (defined $filename && -e $filename);
     return $self;
 }
 
@@ -47,7 +49,7 @@ sub new {
 ##
 ################################################################################
 
-sub read_rdat_file {
+sub read_file {
     my ($self, $filename) = @_;
     print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
     my $logger = get_logger();
@@ -78,6 +80,7 @@ sub read_rdat_file {
 
     
     $self->seqpos_reactivity_map( $self->seqpos(), $self->reactivity() );
+    $self->scaled_reactivity( $self->reactivity() );
 
     if ( $self->rdat_version() == 0.24 ) {
         $logger->info("Correct version.");
@@ -95,7 +98,7 @@ sub read_rdat_file {
 ##
 ################################################################################
 
-sub write_rdat_file {
+sub write_file {
     my ($self, $filename) = @_;
     $self->filename($filename) if (defined $filename);
     my $logger = get_logger();
@@ -311,7 +314,7 @@ sub annotation_data {
         $self->{$method_key} = ();
     }
     return $self->{$method_key}; # returns a RNAprobing::RDATFile::Annotation
-                                  # object reference or an undefined value
+                                 # object reference or an undefined value
 }
 
 sub serialize_annotation_data{
@@ -341,13 +344,40 @@ sub reactivity {
                                  # arrays or just an empty array
 }
 
+sub scaled_reactivity{
+    my ($self, $reactivity) = @_;
+    my $method_key = "SCALED_REACTIVITY";
+
+    if ( defined $reactivity ) {
+        foreach my $aref ( @{$reactivity} ) {
+            my $max_reac = max( @{$aref} );
+            my $min_reac = min( @{$aref} );
+            my $reactivity_span = $max_reac - $min_reac;
+            print '$reactivity_span: '.$reactivity_span."\n";
+            my @scaled_reac = ();
+            # scale the entries in @{$aref}
+            foreach my $reac_value (@{$aref}) {
+                push( @scaled_reac, 
+                      ($reac_value - $min_reac) / $reactivity_span );
+                
+            }
+            print '@scaled_reac: '.join("|",@scaled_reac)."\n";
+            push( @{$self->{$method_key}}, \@scaled_reac);
+        }
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = [];
+    }
+    return $self->{$method_key}; # returns an array reference to an array of
+                                 # arrays or just an empty array
+}
+
 sub serialize_reactivity{
     my $self = shift;
     my $line = "";
     my $reactivity_nr = 0;
     foreach my $aref ( @{ $self->reactivity() }  ) {
         $reactivity_nr++;
-        $line =  "REACTIVITY:".$reactivity_nr;
+        $line =  "REACTIVITY:".$reactivity_nr." ";
         $line .=  join( " ", @{$aref} )."\n";
     }
     return $line;
@@ -394,6 +424,8 @@ sub seqpos_reactivity_map {
                                  # hashes or just an empty array
 }
 
+
+
 ################################################################################
 ##
 ##  Subroutine that creates SEQPOS => REACTIVITY hash
@@ -407,7 +439,6 @@ sub _create_seqpos_reactivity_hash {
     my %pos_reac = ();
 
     if (defined $reac_entry && defined $seqpos ){
-        print Dumper($reac_entry);
         if ( scalar( @{$seqpos} ) == scalar( @{$reac_entry} ) ) {
             for ( my $i = 0; $i < scalar( @{$seqpos} ); $i++ ) {
                 $pos_reac{ $seqpos->[$i] } = $reac_entry->[$i];

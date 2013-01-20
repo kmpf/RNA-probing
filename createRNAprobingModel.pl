@@ -369,7 +369,7 @@ sub calculate_probability_from_experimental_reactivtity {
     my @querypos_reactivity_prob = ();
     my $logger = get_logger();
 
-    for (my $i = 0; $i < @{$querypos_reactivity}; $i++) {
+    for (my $i = 0; $i < scalar( @{$querypos_reactivity}); $i++) {
         my $max_reactivity = max(values(%{$querypos_reactivity->[$i]}));
         $logger->debug($max_reactivity);
         my $min_reactivity = min(values(%{$querypos_reactivity->[$i]}));

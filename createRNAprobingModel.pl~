@@ -556,6 +556,7 @@ sub generate_rdf_model {
         }
 
         my $anno = $rdat_object->annotation_data()->[$i];
+        print Dumper($anno );
         print Dumper($anno->chemicals() );
         $rdf_filename =~ s/\.rdf/$i\.rdf/g;
         open (my $rdf_fh, ">", $rdf_filename)  or die("Can't open $rdf_filename.");
