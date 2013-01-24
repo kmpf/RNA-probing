@@ -36,6 +36,20 @@ require RNAprobing::RDATFile;
 
 ## Definition of constants used for Image::Magick
 
+my %AGAROSE_GEL = (
+    width => 1000,
+    height => 1000,
+    band_height => 10,
+    ltr_space => 33,  # space to the left, at the top and to the right
+    lane_space => 26);
+my %PAA_GEL = ();
+
+my %TEN_WELL_COMB = (
+    nr_wells => 10,
+    well_size_percent => 7
+);
+
+
 my $BAND_HEIGHT = 15;
 my $BAND_WIDTH = 30;
 
@@ -43,11 +57,16 @@ my $BAND_WIDTH = 30;
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");
 my @files = ();
+my $geltype = "Agarose";
 my $verbose = 0;
 my $output_format = "png";
 my $labeled_end = 5;
+# Gel parameter
+
+
 GetOptions(
 	"file|f=s" => \@files,
+    "geltype|g=s" => \$geltype,
 	"verbose|v+" => \$verbose,
     "output-format|o=s" => \$output_format,
     "labeled-end|l=s" => \$labeled_end);
@@ -92,11 +111,10 @@ foreach my $rdat_file ( @rdat_files ) {
     print $rdat_object->serialize_reactivity()."\n";
     print $rdat_object->serialize_reactivity_error()."\n";
 
-    &make_gel($rdat_object);
+    my $gel = ($geltype eq "Agarose") ? \%AGAROSE_GEL : \%PAA_GEL ;
 
-    
+    &make_gel($rdat_object, $gel);   
 }
-
 
 ###############################################################
 ##              
@@ -165,27 +183,30 @@ sub checkFiles {
 
 sub make_gel {
     # get the RDAT object that was used to call us
-    my $rdat_object = shift;
+    my ($rdat_object, $gel) = @_;
 
     my $logger = get_logger("rdat2gel");
     my $sequence = $rdat_object->sequence();
     my $offset = $rdat_object->offset();
     my @seq_pos = @{ $rdat_object->seqpos() };
     my $reactivity = $rdat_object->scaled_reactivity() ;
-    print '@reactivity: '.Dumper($reactivity)."\n";
+    
     # log what we know
     $logger->info("Sequence length: ".length($sequence));
     $logger->info("Offset: ".$offset);
     $logger->info("# of sequence positions: ".scalar(@seq_pos));
+    $logger->info('Reactivities: '.Dumper($reactivity) );
 
-    # the image object everything should end up in
-    my $gel = Image::Magick->new;
-    my $lane = Image::Magick->new;
-    my $band = Image::Magick->new(size => $BAND_WIDTH."x".$BAND_HEIGHT);
+    # $gel is the image object everything should end up in
+    my $gel = Image::Magick->new(width => ${$gel}{width}, height => ${$gel}{height} );
+    my $ 
+    my $lane = Image::Magick->new(width=>${$gel}{lane_width});
+    
+    my $band = Image::Magick->new(size => ${$gel}{lane_width}."x".${$gel}{band_height});
     for ( my $j = 0; $j < scalar(@{ $reactivity}); $j++ ) {
         $logger->info("Lane number: ".$j);
         $logger->info("# of reactivties for lane $j: ". scalar( @{ $reactivity}[$j] ));
-        my $lane_reactivities = ${reactivity}[$j];
+        my $lane_reactivities = $reactivity->[$j];
         print '@{$lane_reactivities}: '.Dumper(@{$lane_reactivities})."\n";
 
         for ( my $i = 0; $i < scalar(@{$lane_reactivities}); $i++ ){
@@ -214,9 +235,10 @@ sub make_gel {
             $perlmagick_error = $band->Read('xc:white');
             warn $perlmagick_error if $perlmagick_error;
             $perlmagick_error = $band->Draw(primitive => "line", points => "0,15 $BAND_WIDTH,15", stroke => "rgb($colour, $colour, $colour)", strokewidth => '10');
+#            $perlmagick_error = $band->Draw(primitive => "line", points => "0,15 $BAND_WIDTH,15", stroke => "rgb($colour, $colour, $colour)", strokewidth => '10');
             warn $perlmagick_error if $perlmagick_error;
-            push (@$lane, @$band);
-            @$band = ();
+            push (@{$lane}, @{$band});
+            @{$band} = ();
             
 #            $lane->Blur(sigma =>'3', radius => '3');
         }
@@ -225,4 +247,30 @@ sub make_gel {
     }
     my $out = $gel->Append(stack => 'false');
     $out->Write('png:out.png');
+}
+
+###############################################################
+##
+## &calculate_wanderlust($tandard, $frag_length);
+## - Performs file checks and returns an array with all succesfully checked files
+## - $standard = Hash reference
+## - $frag_length = length of fragment for which migration distance is to be calculated
+##
+###############################################################
+
+
+sub calculate_wanderlust{
+    my ($standard, $frag_length) = @_;
+    my $fl = Math::BigFloat->new($frag_length);
+    my $y = $fl->blog();
+    my $y1 = $standard->{LDNA}->blog();
+    my $x1 = $standard->{LDIST};
+    my $y2 = $standard->{SDNA}->blog();
+    my $x2 = $standard->{SDIST};
+    my $slope =  ($y2 - $y1) / ( $x2 - $x1 );
+    print '$slope: '.$slope.'=('.$y2.' - '.$y1.') / ('.$x2.' - '.$x1.")\n";
+    my $x = (($y - $y1) + ($slope * $x1)) / $slope;
+    $x->precision(-2);
+    print '$x: '.$x.'=(('.$y.' - '.$y1.') + ('.$slope.' * '.$x1.')) / '.$slope."\n";
+    print $slope.' = '. ($y - $y1) / ($x - $x1)."\n";
 }
