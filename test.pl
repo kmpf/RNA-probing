@@ -68,9 +68,10 @@ my $colour = 155;
 my $gel = Image::Magick->new;
 $gel->Set(size => '1000x1000' );
 $gel->ReadImage('canvas:black');
-$gel->Draw(primitive => "rectangle", points => "100,500 200,600", stroke => "rgb($colour, $colour, $colour)", strokewidth => '10');
+$gel->Draw(primitive => "line", points => "100,500 200,600", stroke => "rgb($colour, $colour, $colour)", strokewidth => '10');
+$gel->Draw(primitive => "line", points => "100,600 200,500", stroke => "red", strokewidth => '10');
 $gel->Write('png:out.png');
-my $out = $gel->Append(stack => 'true');
+
 
 
 
@@ -82,10 +83,10 @@ sub calculate_wanderlust{
     $test->blog(10);
     print $test."\n";
 
-    my $y = $fl->blog();
-    my $y1 = $standard->{LDNA}->blog();
+    my $y = $fl->blog(10);
+    my $y1 = $standard->{LDNA}->blog(10);
     my $x1 = $standard->{LDIST};
-    my $y2 = $standard->{SDNA}->blog();
+    my $y2 = $standard->{SDNA}->blog(10);
     my $x2 = $standard->{SDIST};
     my $slope =  ($y2 - $y1) / ( $x2 - $x1 );
     print '$slope: '.$slope.'=('.$y2.' - '.$y1.') / ('.$x2.' - '.$x1.")\n";
