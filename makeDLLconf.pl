@@ -111,7 +111,6 @@ while (<$sparql_fh>) {
 }
 close $sparql_fh;
 
-print blessed($rdf);
 &test($rdf);
 # my $positive_list = &query_model( $pos_sparql_query, $rdf );
 # my $negative_list= &query_model( $neg_sparql_query, $rdf );
@@ -155,11 +154,10 @@ if ( $neg_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
 
 $negative_list =~ s/[<>]/"/g;
 
-my $conf_file = $rdf_file;
 my $pos_query_name = fileparse( $pos );
 $pos_query_name =~ s/\.sparql$//g;
+my $conf_file = $rdf_file;
 $conf_file =~ s/\.rdf$/\.$pos_query_name\.conf/g;
-
 
 
 open(my $conf_fh, ">", $conf_file) or die "Couldn't open file $conf_file. Error: $!";
@@ -215,10 +213,10 @@ sub configureLogger{
 ###############################################################################
 
 sub query_model {
-    my $sparql_query = shift;
-    my $model = shift;
+    my ($sparql_query, $model) = @_;
 #    print Dumper($model);
-    print blessed($model);
+    my $logger = get_logger();
+    &test($model);
     my $result_list = "";
 
     if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
@@ -248,9 +246,10 @@ sub query_model {
 }
 
 sub test{
-    my $model = shift;
+    my $model = @_;
+    my $logger = get_logger();
 #    print Dumper($model);
-    print blessed($model);
+    $logger->info( blessed($model) );
     return $model;
 }
 

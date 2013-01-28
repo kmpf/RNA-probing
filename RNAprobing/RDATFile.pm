@@ -353,7 +353,6 @@ sub scaled_reactivity{
             my $max_reac = max( @{$aref} );
             my $min_reac = min( @{$aref} );
             my $reactivity_span = $max_reac - $min_reac;
-            print '$reactivity_span: '.$reactivity_span."\n";
             my @scaled_reac = ();
             # scale the entries in @{$aref}
             foreach my $reac_value (@{$aref}) {
@@ -361,13 +360,11 @@ sub scaled_reactivity{
                       ($reac_value - $min_reac) / $reactivity_span );
                 
             }
-            print '@scaled_reac: '.join("|",@scaled_reac)."\n";
             push( @{$self->{$method_key}}, \@scaled_reac);
         }
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
-    print '$self->{$method_key}: '.Dumper($self->{$method_key})."\n";
     return $self->{$method_key}; # returns an array reference to an array of
                                  # arrays or just an empty array
 }

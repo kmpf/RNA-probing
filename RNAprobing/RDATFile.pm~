@@ -353,7 +353,6 @@ sub scaled_reactivity{
             my $max_reac = max( @{$aref} );
             my $min_reac = min( @{$aref} );
             my $reactivity_span = $max_reac - $min_reac;
-            print '$reactivity_span: '.$reactivity_span."\n";
             my @scaled_reac = ();
             # scale the entries in @{$aref}
             foreach my $reac_value (@{$aref}) {

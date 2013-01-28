@@ -45,7 +45,7 @@ sub read_file {
     my @subject_starts = ();
     my @subject_ends = ();
     my @e_values = ();
-    my @bitscores = ();
+    my @bit_scores = ();
 
     open( my $blast_result , "<", $self->filename($filename) ) or
         die "Couldn't open file $self->filename(). Error: $!";
@@ -67,8 +67,8 @@ sub read_file {
             push( @query_ends, $columns[7] );
             push( @subject_starts, $columns[8] );
             push( @subject_ends, $columns[9] );
-            push( @e_value, $columns[10] );
-            push( @bit_score, $columns[11] );
+            push( @e_values, $columns[10] );
+            push( @bit_scores, $columns[11] );
         } else {
             $logger->error("There are more than 12 columns in:\n$line");
             exit 1;
@@ -76,7 +76,7 @@ sub read_file {
     }
     close( $blast_result );
 
-    $self->nr_of_entries()
+    $self->nr_of_entries();
     $self->query_id(\@query_ids);
     $self->subject_id(\@subject_ids);
     $self->percent_identity(\@percent_identities);
@@ -87,8 +87,8 @@ sub read_file {
     $self->query_end(\@query_ends);
     $self->subject_start(\@subject_starts);
     $self->subject_end(\@subject_ends);
-    $self->e_value(\@e_value);
-    $self->bit_score(\@bit_score);
+    $self->e_value(\@e_values);
+    $self->bit_score(\@bit_scores);
 }
 
 ###############################################################
