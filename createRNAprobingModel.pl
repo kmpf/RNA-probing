@@ -93,11 +93,11 @@ my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".__FILE__." has been started. ++++");
 
-###############################################################################
+################################################################################
 #                 
 # Files to objects
 #                 
-###############################################################################
+################################################################################
 
 $blast_result = &checkFiles($blast_result);
 $off_file = &checkFiles($off_file);
@@ -125,11 +125,11 @@ my $blast_result_object = RNAprobing::BLASTresult->new($blast_result);
 # creation of RNAup file object and information extraction
 my $rnaup_object    = RNAprobing::RNAupFile->new($rnaup_file);
 
-###############################################################################
+################################################################################
 #                 
 # Test if the files map correctly
 #                 
-###############################################################################
+################################################################################
 
 # this is the array index to identify the correct line in the BLAST output
 my $blast_array_index = -1;

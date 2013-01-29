@@ -9,8 +9,7 @@ use Data::Dumper;
 require RNAprobing::RDATFile::Annotation;
 
 sub new {
-    my $classname = shift;
-    my $filename = shift;
+    my ($classname, $filename) = @_;
     my $self = {};
 
     &filename($self, $filename);

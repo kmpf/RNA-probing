@@ -39,7 +39,7 @@ my $delete = "";
 my $insert = "";
 my $replace = "";
 my $replace_by = "";
-my $find_pattern = "";
+my $find_pattern = '\.conf';
 my $verbose = 2;
 GetOptions(
     "directory|d=s" => \@directories_to_search,
@@ -55,8 +55,9 @@ GetOptions(
 # Logger initiation  
 #                 
 ###############################################################################
-
-my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
+my $this_file = __FILE__;
+$this_file =~ s/scripts/RNAprobing/g;
+my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
@@ -109,30 +110,26 @@ sub wanted {
                 $logger->info("Couldn't move $file to $backup_file: $!");
                 next;
             }
-            if (open(CONF_FILE, ">", $file)) {
-                $logger->info("Opened $file to write into");
-            } else {
-                $logger->info("Couldn't write to $file");
-                next;
-            }
-            if (open(BACKUP_FILE, "<", $backup_file)) {
-                $logger->info("Opened $backup_file to read from");
-            } else {
-                $logger->info("Couldn't read from $backup_file");
-                next;
-            }
-            while (<BACKUP_FILE>) {
+            open(my $conf_file, ">", $file) or die "Couldn't write to $file";
+            open(my $backup_conf_file, "<", $backup_file) or die "Couldn't read $backup_file";
+
+            while (<$backup_conf_file>) {
                 if ( ($delete ne "") && ($_ =~ m/$delete/) ) {
                     
                 } elsif ( ( $_ =~ m/$replace/ ) && ($replace ne "") && ($replace_by ne "") ) {
-                    print(CONF_FILE "$replace_by\n");
+                    print($conf_file "$replace_by\n");
                 } else {
-                    print(CONF_FILE "$_\n");
+                    print($conf_file "$_\n");
                 }
             }
-            print(CONF_FILE "$insert\n") unless ( $insert eq "" );
-            close(CONF_FILE);
-            close(BACKUP_FILE);
+            open(my $insert_file, "<", $insert) or die "Couldn't read from $file";
+            my $insert_text = "";
+            while (<$insert_file>) {
+                $insert_text .= $_;
+            }
+            print($conf_file $insert_text) unless ( $insert_text eq "" );
+            close($conf_file);
+            close($backup_conf_file);
         } else {
             $logger->info("$file does not match pattern:\"$find_pattern\"");
         }

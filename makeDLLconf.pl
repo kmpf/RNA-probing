@@ -105,17 +105,17 @@ $parser->parse_file_into_model( $base_uri, $rdf_file, $model );
 my $pos_sparql_query = "";
 my $neg_sparql_query = "";
 
-open( my $sparql_fh, "<", $pos) or die "Couldn't open file $pos. Error: $!";
-while (<$sparql_fh>) {
+open( my $pos_sparql_fh, "<", $pos) or die "Couldn't open file $pos. Error: $!";
+while (<$pos_sparql_fh>) {
     $pos_sparql_query .= $_;
 }
-close $sparql_fh;
+close $pos_sparql_fh;
 
 &test($rdf);
 # my $positive_list = &query_model( $pos_sparql_query, $rdf );
 # my $negative_list= &query_model( $neg_sparql_query, $rdf );
-my $positive_list = "";
-my $negative_list = "";
+my @positive_list = ();
+my @negative_list = ();
 
 
 if ( $pos_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
@@ -126,18 +126,18 @@ if ( $pos_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
       # $row is a HASHref containing variable name -> RDF Term bindings
       my @vars = keys %$row;
       foreach my $key ( @vars) {
-        $positive_list .= $row->{ $key }->as_string.",";
+        my $pos_element = $row->{ $key }->as_string;
+        $pos_element =~ s/[<>]/"/g;
+        push(@positive_list, $pos_element);
       }
     }
 }
 
-$positive_list =~ s/[<>]/"/g;
-
-open( my $sparql_fh, "<", $neg) or die "Couldn't open file $neg. Error: $!";
-while (<$sparql_fh>) {
+open( my $neg_sparql_fh, "<", $neg) or die "Couldn't open file $neg. Error: $!";
+while (<$neg_sparql_fh>) {
     $neg_sparql_query .= $_;
 }
-close $sparql_fh;
+close $neg_sparql_fh;
 
 if ( $neg_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
     # SPARQL SELECT Query
@@ -147,12 +147,13 @@ if ( $neg_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
       # $row is a HASHref containing variable name -> RDF Term bindings
       my @vars = keys %$row;
       foreach my $key ( @vars) {
-        $negative_list .= $row->{ $key }->as_string.",";
+        my $neg_element = $row->{ $key }->as_string;
+        $neg_element =~ s/[<>]/"/g;
+        $logger->info($neg_element);
+        push(@negative_list, $neg_element);
       }
     }
 }
-
-$negative_list =~ s/[<>]/"/g;
 
 my $pos_query_name = fileparse( $pos );
 $pos_query_name =~ s/\.sparql$//g;
@@ -164,9 +165,8 @@ open(my $conf_fh, ">", $conf_file) or die "Couldn't open file $conf_file. Error:
 print $conf_fh "// knowledge source
 ks.type = \"OWL File\"
 ks.fileName = \"$rdf_file\"
-lp.positiveExamples = {$positive_list}
-lp.negativeExamples = {$negative_list}
-";
+lp.positiveExamples = {".join(",", @positive_list)."}
+lp.negativeExamples = {".join(",", @negative_list)."}";
 
 close $conf_fh;
 
@@ -238,7 +238,7 @@ sub query_model {
         my $iterator = $query->execute( $model );
         while (my $st = $iterator->next) {
           # $st is a RDF::Trine::Statement object representing an RDF triple
-          $positive_list .= $st->as_string.","; 
+          $result_list .= $st->as_string.","; 
           print $st->as_string;
         }
     }

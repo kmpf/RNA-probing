@@ -360,7 +360,6 @@ sub scaled_reactivity{
                       ($reac_value - $min_reac) / $reactivity_span );
                 
             }
-            print '@scaled_reac: '.join("|",@scaled_reac)."\n";
             push( @{$self->{$method_key}}, \@scaled_reac);
         }
     } elsif ( !( defined $self->{$method_key}) ) {
