@@ -35,7 +35,6 @@ use Path::Class;
 use Pod::Usage;
 use RNA;
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
 #require RNAprobing;
 require RNAprobing::Chemical;
@@ -75,13 +74,12 @@ if ( $help ){
 #                 
 ###############################################################################
 my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
 my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
 
-# Get the logger
+# Get the loggerperl file
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".__FILE__." has been started. ++++");
