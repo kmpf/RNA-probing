@@ -142,7 +142,7 @@ GetOptions(
     "output-format|o=s" => \$output_format,
     "labelled-end|l=s" => \$labelled_end);
 
-if ( $help ){
+if ( $help || !@ARGV ){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
 } elsif ($man) {

@@ -61,7 +61,7 @@ GetOptions(
     "chemical=s" => \$chemical_file,
     "verbose|v+" => \$verbose);
 
-if ( $help ){
+if ( $help || !@ARGV){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
 } elsif ($man) {
