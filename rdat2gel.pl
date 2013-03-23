@@ -5,17 +5,26 @@
 #
 #        USAGE: ./rdat2gel.pl  
 #
-#  DESCRIPTION: 
+#  DESCRIPTION: This script takes any number of provided RDAT files and creates
+#               a gel picture from them. It is still subject to further develop-
+#               ment. Better support for different combs and chamber types should
+#               be implemented.
 #
-#      OPTIONS: ---
-# REQUIREMENTS: ---
-#         BUGS: ---
-#        NOTES: ---
+#      OPTIONS: -f, --file           Can be used multiple times naming a file
+#                                    everytime it is called
+#               -g, --geltype        [PAA, Agarose] 
+#               -v, --verbose        Increases the verbosity level
+#               -o, --output-format  Not used at the moment
+#               -l, --labelled-end   Not used at the moment
+#
+# REQUIREMENTS: ImageMagick Perl bindings
+#         BUGS: 
+#        NOTES: 
 #       AUTHOR: Christoph Kaempf (CK), kaempf@bioinf.uni-leipzig.de
 # ORGANIZATION: 
 #      VERSION: 1.0
 #      CREATED: 05.08.2012 15:26:53
-#     REVISION: ---
+#     REVISION: 
 #===============================================================================
 
 ## Loading modules and initializing variables ##
@@ -31,7 +40,6 @@ use Math::BigFloat;
 use Pod::Usage;
 use Path::Class;
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
 require RNAprobing::RDATFile;
 
@@ -120,16 +128,26 @@ my $comb_type = "10";
 my $detection_type = "Radiography";
 my $verbose = 0;
 my $output_format = "png";
-my $labeled_end = "5'";
+my $labelled_end = "5'";
 # Gel parameter
-
+my $help = 0;
+my $man = 0;
 
 GetOptions(
-	"file|f=s" => \@files,
+    "help|h" => \$help,
+    "man|m" => \$man,
+    "file|f=s" => \@files,
     "geltype|g=s" => \$gel_type,
-	"verbose|v+" => \$verbose,
+    "verbose|v+" => \$verbose,
     "output-format|o=s" => \$output_format,
-    "labeled-end|l=s" => \$labeled_end);
+    "labelled-end|l=s" => \$labelled_end);
+
+if ( $help || !@ARGV ){
+    pod2usage( { -verbose => 1,
+                 -message => "Use this script like this:\n"});
+} elsif ($man) {
+    pod2usage( { -verbose => 2});
+}
 
 ###############################################################################
 #                 
@@ -137,7 +155,6 @@ GetOptions(
 #                 
 ###############################################################################
 my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
 my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
@@ -215,10 +232,26 @@ sub configureLogger{
     my $logger = get_logger($logger_name);
     print $verbose;
     SELECT:{
-	    if ($verbose == 0){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
-	    if ($verbose == 1){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
-	    if ($verbose == 2){ $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
-	    else {$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 0){ 
+		$logger->level($WARN);
+		$logger->debug("Log level is WARN");
+		last SELECT; 
+	    }
+	    if ($verbose == 1){
+		$logger->level($INFO);
+		$logger->debug("Log level is INFO");
+		last SELECT;
+	    }
+	    if ($verbose == 2){
+		$logger->level($DEBUG);
+		$logger->debug("Log level is DEBUG");
+		last SELECT;
+	    }
+	    else {
+		$logger->level($ERROR);
+		$logger->debug("Log level is ERROR");
+		last SELECT;
+	    }
     }
     return $logger;
 }
@@ -285,15 +318,18 @@ sub make_gel {
         my $y2 = $gel->{top_space};
         my $colour = $detection->{bands};
         $gel_image->Draw(primitive => "rectangle", points => "$x1,$y1 $x2,$y2",
-                           stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');   
+                           stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');
     }
 
     my $well_nr = 0;
-    my $filename = "";
+    my $imagename = "";
     for (my  $j = 0; $j < scalar(@{$rdat_objects}); $j++) {
-        next  if ( $well_nr == $comb->{nr_wells}); # Abbruch wenn zu viele wells benutzt werden
+        # Abbruch wenn zu viele wells benutzt werden
+        next  if ( $well_nr == $comb->{nr_wells});
         my $rdat_object = ${$rdat_objects}[$j];
-        $filename .= $rdat_object->filename();
+	my ($filename, $directories) = fileparse($rdat_object->filename());
+        $filename =~ s/\.rdat$//g;
+	$imagename .= $filename . "-";
         my $sequence = $rdat_object->sequence();
         $logger->info("Sequence length: ".length($sequence));
 
@@ -307,20 +343,22 @@ sub make_gel {
         $logger->info("Slope of mig_dist~log(length): $slope");
 
         foreach my $reactivity (@{ $rdat_object->scaled_reactivity() }) {
-            next if ( $well_nr == $comb->{nr_wells}); # Abbruch wenn zu viele wells benutzt werden
+            # Abbruch wenn zu viele wells benutzt werden   
+            next if ( $well_nr == $comb->{nr_wells});
             $logger->info("Reactivity[$well_nr]: ".Dumper($reactivity) );
             $logger->info("# of reactivties for lane $well_nr: ". scalar( @{$reactivity} ));
             my $x_start = $left_space + $well_nr * $comb->{lane_width} + 
                     $well_nr * $comb->{inter_lane_space};
             for (my $i = 0; $i < scalar(@seq_pos); $i++) {
                 my $frag_length;
-                if ( $labeled_end eq "5'" ) {
+                if ( $labelled_end eq "5'" ) {
                     $frag_length = $i + 1;
-                } elsif ( $labeled_end eq "3'" ){
+                } elsif ( $labelled_end eq "3'" ){
                     # 3' part of seq until base $i
                     $frag_length = scalar(@seq_pos) - $i;
                 } else {
-                    $logger->error("Value $labeled_end not allowed for option \"-labeled-end\".") && exit;
+                    $logger->error("Value $labelled_end not allowed for option " . 
+				   "\"--labelled-end\".") && exit;
                 }                
                 my $mig_dist = &calculate_wanderlust($standard, $slope, $frag_length);
                 my $y = $mig_dist + $gel->{top_space};
@@ -343,8 +381,8 @@ sub make_gel {
     }
     $logger->info('$left_space: '.$left_space);
     $gel_image->Blur(sigma =>'5', radius => '5');
-    $filename =~ s/\.rdat//g;
-    $gel_image->Write("png:$filename.png");
+    $imagename =~ s/-$//g;
+    $gel_image->Write("png:$imagename.png");
 
 #           $colour = sprintf("%d", 255 * (1 - $nuc_reactivity) );
 
@@ -396,3 +434,42 @@ sub calculate_slope{
     return $slope;
 }
 
+__END__
+
+=head1 NAME
+
+rdat2gel.pl - creates a gel picture from RNA probing information in a RDAT file
+
+=head1 SYNOPSIS
+
+rdat2gel.pl [options] -f,--file F<rdat-file>
+
+=head1 DESCRIPTION
+
+This script creates a RDAT file, containing the results of I<in silico> probing experiment.
+To perform a probing reaction it needs to be provided with a RNA sequence stored in a FASTA file and the reactivity rules in a special file format that looks like this:
+
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-h, --help>       
+
+Display help message
+
+=item B<-m, --man>
+
+Display whole man page
+
+=item B<-f, --file>
+
+RDAT file containing RNA probing information
+
+=item B<-v, --verbose>
+
+Increases the verbosity level. Can be used multiple times (verbosest if used 3 or more times) 
+
+=back
+
+=cut

@@ -5,17 +5,23 @@
 #
 #        USAGE: ./RNAprobing.pl  
 #
-#  DESCRIPTION: 
+#  DESCRIPTION: this script generates a RDAT file given a RNA sequence in FASTA
+#               format and a file describing the reactivities of a chemical 
 #
-#      OPTIONS: ---
-# REQUIREMENTS: ---
-#         BUGS: ---
-#        NOTES: ---
+#      OPTIONS: -h, --help     Display help message
+#               --fasta        Fasta file containing RNA sequence to be probed
+#               --chemical     Chemical file describing the reactivities of the
+#                              probing reagent
+#               -v, --verbose  
+#               
+# REQUIREMENTS: RNAlib Perl bindings
+#         BUGS: 
+#        NOTES: 
 #       AUTHOR: Christoph Kaempf (CK), kaempf@bioinf.uni-leipzig.de
 # ORGANIZATION: 
 #      VERSION: 1.0
 #      CREATED: 12.09.2012 12:53:10
-#     REVISION: ---
+#     REVISION: 
 #===============================================================================
 
 use strict;
@@ -29,7 +35,6 @@ use Path::Class;
 use Pod::Usage;
 use RNA;
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
 #require RNAprobing;
 require RNAprobing::Chemical;
@@ -43,6 +48,7 @@ require RNAprobing::OFFFile;
 #
 ################################################################################
 my $help = 0;
+my $man = 0;
 my $rdat_file ="";
 my $fasta_file = "";
 my $chemical_file = "";
@@ -50,13 +56,16 @@ my $verbose = 0;
 
 GetOptions(
     "help|h" => \$help,
+    "man|m" => \$man,
     "fasta=s" => \$fasta_file,
     "chemical=s" => \$chemical_file,
     "verbose|v+" => \$verbose);
 
-if ( $help ){
+if ( $help || !@ARGV){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
+} elsif ($man) {
+    pod2usage( { -verbose => 2});
 }
 
 ###############################################################################
@@ -65,13 +74,12 @@ if ( $help ){
 #                 
 ###############################################################################
 my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
 my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
 
-# Get the logger
+# Get the loggerperl file
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".__FILE__." has been started. ++++");
@@ -360,4 +368,66 @@ sub match_all_positions {
     return @ret
 }
 
+__END__
 
+=head1 NAME
+
+sample - Using GetOpt::Long and Pod::Usage
+
+=head1 SYNOPSIS
+
+RNAprobing.pl [options] --fasta F<fasta-file> --chemical F<chemical-file>
+
+=head1 DESCRIPTION
+
+This script creates a RDAT file, containing the results of I<in silico> probing experiment.
+To perform a probing reaction it needs to be provided with a RNA sequence stored in a FASTA file and the reactivity rules in a special file format that looks like this:
+
+=head2 EXAMPLE REACTIVITY FILE 
+
+    > U2 nuclease # Name of reagent
+
+    1.0 # modification strength
+    A # specific RNA sequence
+    U # specific sec. structure
+    | # modification point
+    
+    0.9
+    G # specific RNA sequence
+    U # specific sec. structure
+    | # modification point
+    
+    0.2
+    C # specific RNA sequence
+    U # specific sec. structure
+    | # modification point
+    
+    0.1
+    U # specific RNA sequence
+    U # specific sec. structure
+    | # modification point
+
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-h, --help>       
+
+Display help message
+
+=item B<--fasta>
+
+Fasta file containing RNA sequence to be probed
+
+=item B<--chemical>
+
+Chemical file describing the reactivities of the probing reagent
+
+=item B<-v, --verbose>
+
+Increases the verbosity level. Can be used multiple times (highest level if used 3 or more times) 
+
+=back
+
+=cut

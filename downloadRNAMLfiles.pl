@@ -5,9 +5,19 @@
 #
 #        USAGE: ./downloadRNAMLfiles.pl
 #
-#  DESCRIPTION: 
+#  DESCRIPTION: This script downloads RNAML files from the Rutgers Nucleic
+#               Acid Database given a file where every line begins with the
+#               4-character long NDB ID. Such a file can be downloaded from
+#               the NDB. 
 #
-#      OPTIONS: ---
+#      OPTIONS: -f, --file      File containing a NDB ID (4 characters) per
+#                               line 
+#               -d, --dir       Directory in which to store all downloaded
+#                               RNAML files
+#               -v, --verbose   More verbose output
+#               -h, --help      Display help message
+#               -m, --man       Display man page
+#
 # REQUIREMENTS: ---
 #         BUGS: ---
 #        NOTES: ---
@@ -36,13 +46,25 @@ require RNAprobing::RDATFile;
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");
 my $file = "";
+my $store_dir = "";
 my $help = 0;
+my $man = 0;
 my $verbose = 0;
 
 GetOptions(
-    "help|h"    => \$help,
-	"file|f=s"  => \$file,
-	"verbose|v+" => \$verbose);
+    "help|h" => \$help,
+    "man|m" => \$man,
+    "file|f=s" => \$file,
+    "dir|d=s" => \$store_dir,
+    "verbose|v+" => \$verbose) or pod2usage( -verbose => 1 && exit;
+
+if ( $help ) {
+    pod2usage( -verbose => 1 ) && exit;
+} elsif ( $man ) {
+    pod2usage( -verbose => 2 ) && exit;
+} elsif ($file eq "") {
+    pod2usage( -verbose => 1 ) && exit;
+}
 
 ###############################################################################
 #                 
@@ -60,16 +82,17 @@ my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".__FILE__." has been started. ++++");
 
-
-
-
-
 my $base_url = "http://ndbserver.rutgers.edu/atlas/";
 my $nmr = "nmr/structures/";
 my $xray = "xray/structures/";
 my $rnaml_ext = "-rna1.xml";
-my $store_directory = "./RNAML_files_from_NDB";
-mkdir($store_directory);
+if ( -e $store_dir) {
+    logger.info("Directory $store_dir already exists.");
+elsif (! (-e $store_dir)){
+    logger.debug("Directory $store_dir does not exist.")
+    mkdir($store_directory);
+    logger.debug("Directory $store_dir has been created.")
+}
 my $rnaml_files_list = "rnaml_files.list";
 
 open(my $ndb_entries_file, "<", $file) or die("Can't open $file.");
@@ -98,4 +121,49 @@ while ( <$ndb_entries_file> ) {
 }
 
 close( $ndb_entries_file );
+
+
+__END__
+
+
+=head1 NAME
+
+downloadRNAMLfiles.pl - downloads RNAML files from the Rutgers NDB
+
+=head1 DESCRIPTION
+
+This script downloads RNAML files from the Rutgers Nucleic Acid Database given a file where every line begins with the 4-character long NDB ID. Such a file can be downloaded from the NDB. It creates a file listing all downloaded RNAML files, called 'rnaml_files.list'.
+
+=head1 SYNOPSIS
+
+downloadRNAMLfiles.pl -f=</path/to/file> -d </path/to/dir> -v -v -v
+
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-f, --file>
+
+File that holds a NDB ID (4 characters long) at the beginning of each line
+
+=item B<-d, --dir>
+
+Directory in which the RNAML files are stored.
+
+=item B<-h, --help>
+
+Print help message
+
+=item B<-m, --man>
+
+Display man page
+
+=item B<-v, --verbose>
+
+Increases the verbosity level. Can be used multiple times (highest level if used 3 or more times) 
+
+=back
+
+=cut
 
