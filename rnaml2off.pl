@@ -135,7 +135,7 @@ foreach my $rnaml_file ( @rnaml_files ){
 
     foreach my $key ( keys %{$data->{'molecule'}}){
         ## $off_file = file name for the output file (off = our file format)
-        $filename =~ s/-rna1\.xml$//g;
+        $filename =~ s/rna1\.xml$//g;
         my $ndb_id = $filename;
         $logger->debug("NDB ID of $rnaml_file is $ndb_id.");
         $logger->debug("Key of actual molecule is $key.");
@@ -570,11 +570,36 @@ __END__
    rnaml2off.pl -m
  This perl script relies on the Log::Log4perl, Path::Class and XML::Simple modules. Please make sure the according packages are around on your system.
 
-=head1 ARGUMENTS
+=head1 OPTIONS
+
+=over 8
+
+=item B<-h, --help>
+
+Display help message
+
+=item B< -m, --man>
+
+Display man page
+
+=item B<--dumper>
+
+Switch for debugging purpose. If set all found base pair informations are logged.
+
+=item B<-f, --file>
+
+RNAML file that is transformed into OFF file. This flag can be given multiple times.
+
+=item B<-d, --directory>
+
+Directory recursively searched for RNAML files ending on rna1.xml. 
+
+=item B<-n, --notation>
 
 
 
+=item B<-v, --verbose>
 
+Increases the verbosity level. Can be used multiple times (highest level if used 3 or more times) 
 
 =cut
-

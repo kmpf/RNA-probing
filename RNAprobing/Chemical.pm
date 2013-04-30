@@ -51,10 +51,11 @@ sub read_reactivity_file {
         $line =~ s/#.*$//g; # remove in-line comments
         $line =~ s/\s+$//;
         $line_nr++;
-        $self->probe_name($line) if ($line_nr == 1 && 1 == ($line =~ s/^>\s*//g) );
+        $self->probe_name($line) if ($line_nr == 1 && 1 == ($line =~ s/^>//g) );
         $self->probe_reac($line) if ($line_nr == 2 && $line <= 1);
         $self->probe_seq($line) if ($line_nr == 3); # könnte man noch auf zugelassene Nucleotide prüfen
         $self->probe_str($line) if ($line_nr == 4); # könnte man noch auf zugelassene Strukturelemente prüfen
+        # get modification position and reset counter for next block
         if ($line_nr == 5) {$self->probe_cut($line); $line_nr = 1;}
         
         

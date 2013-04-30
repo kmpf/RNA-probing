@@ -42,7 +42,7 @@ require RNAprobing::OFFFile;
 require RNAprobing::BLASTresult;
 require RNAprobing::RNAupFile;
 
-################################################################################
+###############################################################################
 #
 # Options section
 #
