@@ -1,31 +1,22 @@
-package RNAprobing::RDATFile;
+package RNAprobing::RDATFile::Name;
 
-use strict;
-use warnings;
-use Carp;
-use List::Util qw(first max maxstr min minstr reduce shuffle sum);
 use Log::Log4perl qw(get_logger :levels);
-use Data::Dumper;
-require RNAprobing::RDATFile::Annotation;
-require RNAprobing::RDATFile::Name;
 
 print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
 my $logger = get_logger();
 
 sub new {
-    my ($classname, $filename) = @_;
+    my ($classname, $name) = @_;
     my $self = {};
 
-    &filename($self, $filename);
-    &rdat_version($self);
-    &name($self);
+    &name($self, $name);
     &sequence($self);
     &structure($self);
     &offset($self);
     &seqpos($self);
+    &mutpos($self);
     &annotation($self);
     &comment($self);
-    &mutpos($self);
     &annotation_data($self);
     &reactivity($self);
     &reactivity_error($self);
@@ -34,53 +25,14 @@ sub new {
 
     bless $self, $classname;
 
-    $self->read_file($filename);
-
     return $self;
 }
 
-# Construct section
-
-sub seqpos_reactivity_map {
-    my ($self, $seqpos, $reactivity) = @_;
-    my $method_key = "SEQPOS_REACTIVITY_MAP";
-
-    if ( defined $reactivity && defined $seqpos ){
-        foreach my $reac_entry ( @{$reactivity}){
-            push( @{$self->{$method_key}}, 
-                $self->_create_seqpos_reactivity_hash($seqpos, $reac_entry) );
-        }
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # hashes or just an empty array
-}
-
-################################################################################
-################################################################################
-##
-##  Subroutine section
-##
-################################################################################
-################################################################################
-
-################################################################################
-##
-##  Subroutine that reads in a RDAT file
-##
-################################################################################
-
-sub read_file {
-    my ($self, $filename) = @_;
-    $self->filename( $filename );
-    
-    open ( my $rdat_file , "<", $self->filename() ) or croak "Couldn't open file $self->filename(). Error: $!";
-
-    my ($name, $lines) = "";
-
-    while (my $line = <$rdat_file>) {
-
+sub create_name {
+    my ($self, $lines) = @_;
+    die "No Input for RNAprobing::RDATFile::Name->create_name()" 
+        unless ( defined $lines );
+    foreach my $line ( split(/\n/, $lines) ) {
         chomp( $line );
         my $comment = '^#|^\s*$';
         next if ($line =~ /$comment/ );
@@ -88,8 +40,6 @@ sub read_file {
         my @split = split( /\s+/, $words[1]);
 
         # Construct section lines
-        $self->rdat_version( $words[1] ) if ($words[0] =~ /^RDAT_VERSION$/);
-	$self->name( $words[1] ) if ($words[0] =~ /^NAME$/)
         $self->sequence( $words[1] ) if ($words[0] =~ /^SEQUENCE$/);
         $self->structure( $words[1] ) if ($words[0] =~ /^STRUCTURE$/);
         $self->offset( $words[1] ) if ($words[0] =~ /^OFFSET$/);
@@ -118,36 +68,12 @@ sub read_file {
         if ($words[0] =~ /^READS:(\d+)$/) {
             $self->reads( [@split], $1 );
         }
-    
     }
-    close($rdat_file);
-
-    $self->seqpos_reactivity_map( $self->seqpos(), $self->reactivity() );
-    $self->scaled_reactivity( $self->reactivity() );
-
-    if ( $self->rdat_version() == 0.24 ) {
-        $logger->info("Correct version.");
-    } else {
-        $logger->error("Incorrect Version. There may occur errors while parsing this file.");
-    }
-
-    return $self;
 }
 
-################################################################################
-##
-##  Write file subroutine
-##
-################################################################################
-
-sub write_file {
-    my ($self, $filename) = @_;
-    $self->filename($filename) if (defined $filename);
-    my $file_content = 
-
-    my $file_content = $self->serialize_rdat_version().
-        $self->serialize_name().
-	$self->serialize_sequence().
+sub serialize_construct {
+    my ($self) = @_;
+    my $file_content = $self->serialize_sequence().
         $self->serialize_structure().
         $self->serialize_offset().
         $self->serialize_seqpos().
@@ -162,68 +88,11 @@ sub write_file {
 #        $self->serialize_data_seqpos().
         $self->serialize_trace().
         $self->serialize_reads();
-
-    open( my $rdat_file, ">", $self->filename() ) or 
-	croak( "Couldn't open file". $self->filename() );
-    print($rdat_file  $file_content);
-    close($rdat_file);
-    $logger->info($file_content);
+    return $file_content;
 }
 
 
 # Construct section
-
-sub seqpos_reactivity_map {
-    my ($self, $seqpos, $reactivity) = @_;
-    my $method_key = "SEQPOS_REACTIVITY_MAP";
-
-    if ( defined $reactivity && defined $seqpos ){
-        foreach my $reac_entry ( @{$reactivity}){
-            push( @{$self->{$method_key}}, 
-                $self->_create_seqpos_reactivity_hash($seqpos, $reac_entry) );
-        }
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # hashes or just an empty array
-}
-
-################################################################################
-##
-##  Getter/Setter subroutines 
-##
-################################################################################
-
-sub filename {
-    my ($self, $filename) = @_;
-    my $method_key = "FILENAME";
-    if ( defined $filename ){
-        $self->{$method_key} = $filename;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
-    }
-    return $self->{$method_key}; # returns a scalar
-}
-
-sub rdat_version {
-    my ($self, $rdat_version) = @_;
-    my $method_key = "RDAT_VERSION";
-    
-    if ( defined $rdat_version){
-        $self->{$method_key} = $rdat_version;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "0.24";
-    }
-    return $self->{$method_key}; # returns a scalar
-}
-
-sub serialize_rdat_version {
-    my $self = shift;
-    my $line = "RDAT_VERSION ".$self->rdat_version()."\n";
-    return $line;
-}
-
 
 sub name {
     my ($self, $name) = @_;
@@ -588,6 +457,24 @@ sub serialize_reads{
     return $line;
 }
 
+sub seqpos_reactivity_map {
+    my ($self, $seqpos, $reactivity) = @_;
+    my $method_key = "SEQPOS_REACTIVITY_MAP";
+
+    if ( defined $reactivity && defined $seqpos ){
+        foreach my $reac_entry ( @{$reactivity}){
+            push( @{$self->{$method_key}}, 
+                $self->_create_seqpos_reactivity_hash($seqpos, $reac_entry) );
+        }
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = [];
+    }
+    return $self->{$method_key}; # returns an array reference to an array of
+                                 # hashes or just an empty array
+}
+
+
+
 ################################################################################
 ##
 ##  Subroutine that creates SEQPOS => REACTIVITY hash
@@ -621,10 +508,5 @@ sub _href_to_string{
         $line = " ".$key.":".$href->{$key};
     }
     return $line;
-
-    bless( $self, $classname );
-
-    return $self;
 }
-
-1;
+ 1;

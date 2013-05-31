@@ -59,7 +59,7 @@ GetOptions(
 #                 
 ###############################################################################
 my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
+#$this_file =~ s/scripts/RNAprobing/g;
 my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
@@ -76,38 +76,42 @@ pod2usage(-verbose => 2) && exit if ( $man );
 
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnaml_files
 ##  - find all rna1.xml files in the @directories given and add them to @files
-foreach (@directories) {
-    if ( -d $_ ) {
-        $logger->info("$_ is a directory");
-        $logger->info("Looking for rna1.xml files in $_");
-        $logger->info( find( sub { push( @files, $File::Find::name) if ($_ =~ /rna1\.xml$/) }, $_) );
-    } else {
-        $logger->info("$_ isn't a directory");
+if ( scalar(@directories ) != 0 ){
+    my @checked_directories = [];
+    foreach (@directories) {
+	if ( -d $_ ) {
+	    $logger->info("$_ is a directory");
+	    push( @checked_directories, $_ );
+	} else {
+	    $logger->info("$_ isn't a directory");
+	}
     }
+    $logger->error("No valid directory given.") && exit 0 
+	if ( scalar(@checked_directories) == 0 && scalar(@files) == 0 );
+    $logger->info("Looking for rna1.xml files in directories:\n".
+		  join("\n", @checked_directories));
+    find(\&wanted, @checked_directories);
 }
 
 ##  - check found files and add them to @rnaml_files if they passed the checks
-my @rnaml_files = &checkFiles(@files);
+my $rnaml_files = &checkFiles(@files);
 
 ## Check for correct notation selection ##
 my $notation = "";
 if ($nota eq "LW") {
     $logger->info("Leontis-Westhof notation selected.");
     $notation = "LW";
-}
-if ($nota eq "BP" ) {
+} elsif ($nota eq "BP" ) {
     $logger->info("Base pair notation selected.");
     $notation = "BP";
-}
-if ($nota eq "LW+" ) {
+} elsif ($nota eq "LW+" ) {
     $logger->info("Leontis-Westhof notation with nucleotide/amino acid interactions selected.");
     $notation = "LW+";
-}
-if ($nota eq "LG" ) {
+} elsif ($nota eq "LG" ) {
     $logger->info("Lee-Guttel notation selected.");
     $notation = "LG";
-}
-else {
+} else {
+    $logger->info("Notation set to Leontis-Westhof.");
     $notation = "LW";
 }
 
@@ -122,7 +126,7 @@ my $xml = new XML::Simple;
 
 # parse XML files
 
-foreach my $rnaml_file ( @rnaml_files ){
+foreach my $rnaml_file ( @{$rnaml_files} ){
     ## $data - is the XML::Simple object that holds the representation of the RNAML file
     my $data = $xml->XMLin($rnaml_file, ForceArray => 1);
 
@@ -135,7 +139,7 @@ foreach my $rnaml_file ( @rnaml_files ){
 
     foreach my $key ( keys %{$data->{'molecule'}}){
         ## $off_file = file name for the output file (off = our file format)
-        $filename =~ s/rna1\.xml$//g;
+        $filename =~ s/-rna1\.xml$//g;
         my $ndb_id = $filename;
         $logger->debug("NDB ID of $rnaml_file is $ndb_id.");
         $logger->debug("Key of actual molecule is $key.");
@@ -207,7 +211,7 @@ foreach my $rnaml_file ( @rnaml_files ){
             foreach my $key (@bpStart5p){
                 my @bpLW = @{ $bp{$key} };
                 ## insert opening and closing bracket for every standard Watson-Crick base pair
-                @dotBracket = &insertBrackets($bpLW[0], $bpLW[1], $bpLW[3], $bpLW[4], \@dotBracket, \@bracket_stack);
+                @dotBracket = &insertBrackets($bpLW[0], $bpLW[1], $bpLW[3], $bpLW[4], \@dotBracket, \@bracket_stack, $filename);
                 @colSize = &colSizeUpdate($bpLW[0], $bpLW[1], $bpLW[2], \@colSize);
             }
             ## $dbString - is the output string of the Dot-Bracket notation
@@ -262,7 +266,7 @@ foreach my $rnaml_file ( @rnaml_files ){
 ###############################################################
 
 sub checkFiles {
-    my @testfiles = shift;
+    my @testfiles = @_;
     my @checkedfiles = ();
     my $logger = get_logger("RNAprobing");
 
@@ -283,7 +287,7 @@ sub checkFiles {
             $logger->error("$_ is a directory") if ( -d $_);
         }
     }
-    return @checkedfiles;
+    return \@checkedfiles;
 }
 
 ###############################################################################
@@ -371,6 +375,7 @@ sub insertBrackets{
     my $edge3P = $_[3];
     my @dotBracket = @{$_[4]};
     my $bracket_stack = $_[5];
+    my $filename = $_[6];
     my $bracket_type = 0;
     my %opening_brackets = ( 0 => '(', 1 => '[', 2 => '{', 3 => '<' );
     my %closing_brackets = ( 0 => ')', 1 => ']', 2 => '}', 3 => '>' );
@@ -390,14 +395,17 @@ sub insertBrackets{
                 $bracket_type = $i + 1;
                 last;
             } elsif ($pos5P < ${$bracket_stack}[$i] && $pos3P > ${$bracket_stack}[$i]) {
-                $logger->info("Detected pseudoknot crossing ".($i + 1)." edges.");
+                $logger->info("Detected pseudoknot.");
                 $bracket_type = $i + 1;
             } else {
-               $logger->error("Encountered a problem with the pseudoknot detection!");
+               $logger->error($filename.": Encountered a problem with the pseudoknot detection! Bracket stack:");
+	       $logger->error( Dumper($bracket_stack) );
+	       $logger->error($filename . ": 5' bp of edge: " . $pos5P);
+	       $logger->error($filename . ": 3' bp of edge: " . $pos3P);
             }
         }
         if ( $bracket_type > 3 ){
-            $logger->error("More than four entangled pseudoknots! HELP!");
+            $logger->error($filename.": More than four entangled pseudoknots! HELP!");
         } else {
             $dotBracket[$pos5P-1] = $opening_brackets{$bracket_type};
             $dotBracket[$pos3P-1] = $closing_brackets{$bracket_type};

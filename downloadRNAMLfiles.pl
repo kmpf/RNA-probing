@@ -82,6 +82,11 @@ my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".__FILE__." has been started. ++++");
 
+###############################################################################
+#                 
+# Assemble download URLs and download  
+#                 
+###############################################################################
 
 my $base_url = "http://ndbserver.rutgers.edu/atlas/";
 my $nmr = "nmr/structures/";

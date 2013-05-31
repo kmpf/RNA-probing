@@ -35,7 +35,7 @@ use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
+#$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
 require RNAprobing::RDATFile;
 require RNAprobing::OFFFile;
@@ -60,18 +60,19 @@ my $lower_limit;
 my $upper_limit;
 
 GetOptions(
-    "blastResults=s" => \$blast_result,
-    "csv" => \$csv,
-    "off=s" => \$off_file,
-    "rdat=s" => \$rdat_file,
-    "rnaup=s" => \$rnaup_file,
-    "rdf" => \$rdf_out,
-    "owl=s"=> \$owl_file,
-    "verbose|v+" => \$verbose,
+    "blastResults=s" => \$blast_result, # optional
+    "csv" => \$csv, #optional
+    "off=s" => \$off_file, #optional
+    "rdat=s" => \$rdat_file, #optional
+    "rnaup=s" => \$rnaup_file, #optional
+    "rdf" => \$rdf_out, # optional
+    "owl=s"=> \$owl_file, 
+    "verbose|v+" => \$verbose, # optional
     "ll" => \$lower_limit,
     "ul" => \$upper_limit);
 
-if ( $help || $off_file eq "" || $rdat_file eq "" || $rnaup_file eq "" || $blast_result eq "" ){
+if ( $help || $off_file eq "" ) {
+# $rdat_file eq "" || $rnaup_file eq "" || $blast_result eq "" ){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
 }
@@ -81,8 +82,6 @@ if ( $help || $off_file eq "" || $rdat_file eq "" || $rnaup_file eq "" || $blast
 # Logger initiation  
 #                 
 ###############################################################################
-my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
 my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
@@ -99,15 +98,15 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 #                 
 ################################################################################
 
-$blast_result = &checkFiles($blast_result);
-$off_file = &checkFiles($off_file);
-$rdat_file = &checkFiles($rdat_file);
-$owl_file = &checkFiles($owl_file);
+# check if input files exist
+$blast_result = &checkFiles($blast_result) if ( $blast_result ne "" );
+$off_file = &checkFiles($off_file) if ( $off_file ne "" );
+$rdat_file = &checkFiles($rdat_file) if ( $rdat_file ne "" );
+$owl_file = &checkFiles($owl_file) if ( $owl_file ne "" );
 
 # creation of RDAT file object and information extraction
 my $rdat_object     = RNAprobing::RDATFile->new($rdat_file);
-
-#$rdat_object->read_rdat_file($rdat_file);
+$rdat_object->read_file($rdat_file);
 my $rdat_filename   = fileparse($rdat_object->filename());
 my $rdat_offset     = $rdat_object->offset();
 my $rdat_reactivity = $rdat_object->reactivity();
