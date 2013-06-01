@@ -30,7 +30,6 @@ use Log::Log4perl qw(get_logger :levels);
 use Path::Class;
 use Pod::Usage;
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
 require RNAprobing::RDATFile;
 
@@ -42,10 +41,10 @@ my $help = 0;
 my $verbose = 0;
 my $to_dna = 0;
 GetOptions(
-	"file|f=s" => \@files,
+    "file|f=s" => \@files,
     "directory|d=s" => \@directories,
     "toDNA|t" => \$to_dna,
-	"verbose|v+" => \$verbose);
+    "verbose|v+" => \$verbose);
 
 if ( $help || scalar(@files) == 0 && scalar(@directories) == 0 ){
     pod2usage( { -verbose => 1,
@@ -56,9 +55,8 @@ if ( $help || scalar(@files) == 0 && scalar(@directories) == 0 ){
 # Logger initiation  
 #                 
 ###############################################################################
-my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
-my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
+
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
@@ -72,8 +70,22 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnamlFiles
 ##  - find all rna1.xml files in the @directories given and add them to @files
-find( \&wanted, @directories) unless ( scalar(@directories) == 0 );
-$logger->info("\@files after find(): ". join(";", @files));
+if ( scalar(@directories ) != 0 ){
+    my @checked_directories = [];
+    foreach (@directories) {
+	if ( -d $_ ) {
+	    $logger->info("$_ is a directory");
+	    push( @checked_directories, $_ );
+	} else {
+	    $logger->info("$_ isn't a directory");
+	}
+    }
+    $logger->error("No valid directory given.") && exit 0 
+	if ( scalar(@checked_directories) == 0 && scalar(@files) == 0 );
+    $logger->info("Looking for rdat files in directories:\n".
+		  join("\n", @checked_directories));
+    find(\&wanted, @checked_directories);
+}
 
 ##  - check found files and add them to @rdat_files if they passed the checks
 my $rdat_files = &checkFiles(\@files);

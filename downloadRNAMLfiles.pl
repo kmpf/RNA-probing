@@ -39,9 +39,7 @@ use Log::Log4perl qw(get_logger :levels);
 use Path::Class;
 use Pod::Usage;
 my $module_dir = dirname(__FILE__);
-#$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
-#require RNAprobing::RDATFile;
 
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");

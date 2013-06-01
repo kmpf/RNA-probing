@@ -7,7 +7,7 @@ use List::Util qw(first max maxstr min minstr reduce shuffle sum);
 use Log::Log4perl qw(get_logger :levels);
 use Data::Dumper;
 require RNAprobing::RDATFile::Annotation;
-require RNAprobing::RDATFile::Name;
+require RNAprobing::RDATFile::Data;
 
 print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
 my $logger = get_logger();
@@ -26,35 +26,19 @@ sub new {
     &annotation($self);
     &comment($self);
     &mutpos($self);
+
     &annotation_data($self);
     &reactivity($self);
     &reactivity_error($self);
+    &xsel_refine($self);
     &seqpos_reactivity_map($self);
     &scaled_reactivity($self);
 
     bless $self, $classname;
 
-    $self->read_file($filename);
+    $self->read_file($filename) if ($filename ne "");
 
     return $self;
-}
-
-# Construct section
-
-sub seqpos_reactivity_map {
-    my ($self, $seqpos, $reactivity) = @_;
-    my $method_key = "SEQPOS_REACTIVITY_MAP";
-
-    if ( defined $reactivity && defined $seqpos ){
-        foreach my $reac_entry ( @{$reactivity}){
-            push( @{$self->{$method_key}}, 
-                $self->_create_seqpos_reactivity_hash($seqpos, $reac_entry) );
-        }
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # hashes or just an empty array
 }
 
 ################################################################################
@@ -89,7 +73,7 @@ sub read_file {
 
         # Construct section lines
         $self->rdat_version( $words[1] ) if ($words[0] =~ /^RDAT_VERSION$/);
-	$self->name( $words[1] ) if ($words[0] =~ /^NAME$/)
+	$self->name( $words[1] ) if ($words[0] =~ /^NAME$/);
         $self->sequence( $words[1] ) if ($words[0] =~ /^SEQUENCE$/);
         $self->structure( $words[1] ) if ($words[0] =~ /^STRUCTURE$/);
         $self->offset( $words[1] ) if ($words[0] =~ /^OFFSET$/);
@@ -99,28 +83,14 @@ sub read_file {
         $self->xsel( [@split] ) if ($words[0] =~ /^XSEL$/);
         $self->mutpos( [@split] ) if ($words[0] =~ /^MUTPOS$/);
 
-        # Data section lines
-        if ($words[0] =~ /^ANNOTATION_DATA:(\d+)$/) {
-            $self->annotation_data( $words[1], $1 );
+        # Collect data section lines
+        if ($words[0] =~ /^[\w]*:(\d+)$/) {
+            $lines .= $line."\n";
         }
-        if ($words[0] =~ /^REACTIVITY:(\d+)$/) {
-            $self->reactivity( [@split], $1 );
-        }
-        if ($words[0] =~ /^REACTIVITY_ERROR:(\d+)$/) {
-            $self->reactivity_error( [@split], $1 );
-        }
-        if ($words[0] =~ /^XSEL_REFINE:(\d+)$/) {
-            $self->xsel_refine( [@split], $1 );
-        }
-        if ($words[0] =~ /^TRACE:(\d+)$/) {
-            $self->trace( [@split], $1 );
-        }
-        if ($words[0] =~ /^READS:(\d+)$/) {
-            $self->reads( [@split], $1 );
-        }
-    
     }
     close($rdat_file);
+    
+    my $data_object = RNAprobing::RDATFile::Data->new($lines);
 
     $self->seqpos_reactivity_map( $self->seqpos(), $self->reactivity() );
     $self->scaled_reactivity( $self->reactivity() );
@@ -143,8 +113,6 @@ sub read_file {
 sub write_file {
     my ($self, $filename) = @_;
     $self->filename($filename) if (defined $filename);
-    my $file_content = 
-
     my $file_content = $self->serialize_rdat_version().
         $self->serialize_name().
 	$self->serialize_sequence().
@@ -188,6 +156,7 @@ sub seqpos_reactivity_map {
     return $self->{$method_key}; # returns an array reference to an array of
                                  # hashes or just an empty array
 }
+
 
 ################################################################################
 ##
@@ -416,177 +385,6 @@ sub serialize_mutpos{
     return $line;
 }
 
-# Data section
-
-sub annotation_data {
-    my ($self, $annotation_data, $index) = @_;
-    my $method_key = "ANNOTATION_DATA";
-
-    if ( defined $annotation_data && defined $index){
-        $self->{$method_key}->{$index} = RNAprobing::RDATFile::Annotation->new($annotation_data);
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = {};
-    }
-    return $self->{$method_key}; # returns an hash ref to an hash of 
-                                 # RNAprobing::RDATFile::Annotation object
-                                 # references or an undefined value
-}
-
-sub serialize_annotation_data{
-    my $self = shift;
-    my $line = "";
-    foreach my $index ( keys %{$self->annotation_data()} ) {
-            $line =  "ANNOTATION_DATA:".$index." ";
-            $line .= $self->annotation_data()->{$index}->serialize_annotation();
-            $line .= "\n";
-    }
-    return $line;
-}
-
-sub reactivity {
-    my ($self, $reactivity, $index) = @_;
-    my $method_key = "REACTIVITY";
-    if ( defined $reactivity && defined $index){
-        $self->{$method_key}->{$index} = $reactivity;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = {};
-    }
-    return $self->{$method_key}; # returns an hash reference to an hash of
-                                 # arrays or just an empty array
-}
-
-sub scaled_reactivity{
-    my ($self, $reactivity) = @_;
-    my $method_key = "SCALED_REACTIVITY";
-
-    if ( defined $reactivity ) {
-        foreach my $aref ( @{$reactivity} ) {
-            my $max_reac = max( @{$aref} );
-            my $min_reac = min( @{$aref} );
-            my $reactivity_span = $max_reac - $min_reac;
-            my @scaled_reac = ();
-            # scale the entries in @{$aref}
-            foreach my $reac_value (@{$aref}) {
-                push( @scaled_reac, 
-                      ($reac_value - $min_reac) / $reactivity_span );
-                
-            }
-            push( @{$self->{$method_key}}, \@scaled_reac);
-        }
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # arrays or just an empty array
-}
-
-sub serialize_reactivity {
-    my $self = shift;
-    my $line = "";
-    if ( %{$self->reactivity()} ) {
-        foreach my $index ( keys %{$self->reactivity()} ) {
-            $line =  "REACTIVITY:".$index." ";
-            $line .=  join( " ", @{ $self->reactivity()->{$index} })."\n";
-        }
-    } else {
-        $logger->error("Missing mandatory REACTIVITY entry.");
-        $logger->error("RDAT output is erroneous.");
-    }
-    return $line;
-}
-
-sub reactivity_error {
-    my ($self, $reactivity_error, $index) = @_;
-    my $method_key = "REACTIVITY_ERROR";
-
-    if ( defined $reactivity_error && defined $index){
-        $self->{$method_key}->{$index} = $reactivity_error;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = {};
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # arrays or just an empty array
-}
-
-sub serialize_reactivity_error{
-    my $self = shift;
-    my $line = "";
-
-    foreach my $index ( keys %{$self->reactivity_error()} ) {
-        $line =  "REACTIVITY_ERROR:".$index." ";
-        $line .=  join( " ", @{$self->reactivity_error()->{$index}} )."\n";
-    }
-    return $line;
-}
-
-sub xsel_refine {
-    my ($self, $xsel_refine, $index) = @_;
-    my $method_key = "XSEL_REFINE";
-
-    if ( defined $xsel_refine && defined $index){
-        $self->{$method_key}->{$index} = $xsel_refine;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = {};
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # arrays or just an empty array
-}
-
-sub serialize_xsel_refine{
-    my $self = shift;
-    my $line = "";
-    foreach my $index ( keys %{$self->xsel_refine()} ) {
-        $line =  "XSEL_REFINE:".$index." ";
-        $line .=  join( " ", @{$self->xsel_refine()->{$index}} )."\n";
-    }
-    return $line;
-}
-
-sub trace {
-    my ($self, $trace, $index) = @_;
-    my $method_key = "TRACE";
-
-    if ( defined $trace && defined $index){
-        $self->{$method_key}->{$index} = $trace;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = {};
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # arrays or just an empty array
-}
-
-sub serialize_trace {
-    my $self = shift;
-    my $line = "";
-    foreach my $index ( keys %{$self->trace()} ) {
-        $line =  "TRACE:".$index." ";
-        $line .=  join( " ", @{$self->trace()->{$index}} )."\n";
-    }
-    return $line;
-}
-
-sub reads {
-    my ($self, $reads, $index) = @_;
-    my $method_key = "READS";
-
-    if ( defined $reads && defined $index){
-        $self->{$method_key}->{$index} = $reads;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = {};
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # arrays or just an empty array
-}
-
-sub serialize_reads{
-    my $self = shift;
-    my $line = "";
-    foreach my $index ( keys %{$self->reads()} ) {
-        $line =  "READS:".$index;
-        $line .=  join( " ", @{$self->reads()->{$index}} )."\n";
-    }
-    return $line;
-}
 
 ################################################################################
 ##
@@ -621,10 +419,6 @@ sub _href_to_string{
         $line = " ".$key.":".$href->{$key};
     }
     return $line;
-
-    bless( $self, $classname );
-
-    return $self;
 }
 
 1;

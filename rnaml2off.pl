@@ -58,9 +58,8 @@ GetOptions(
 # Logger initiation  
 #                 
 ###############################################################################
-my $this_file = __FILE__;
-#$this_file =~ s/scripts/RNAprobing/g;
-my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
+
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
