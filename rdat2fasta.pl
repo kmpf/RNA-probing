@@ -31,25 +31,27 @@ use Path::Class;
 use Pod::Usage;
 my $module_dir = dirname(__FILE__);
 push(@INC, $module_dir);
-require RNAprobing::RDATFile;
 
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");
 my @files = ();
 my @directories = ();
 my $help = 0;
+my $man = 0;
 my $verbose = 0;
 my $to_dna = 0;
 GetOptions(
     "file|f=s" => \@files,
     "directory|d=s" => \@directories,
     "toDNA|t" => \$to_dna,
+    "help|h" => \$help,
+    "man|m" => \$man,
     "verbose|v+" => \$verbose);
 
-if ( $help || scalar(@files) == 0 && scalar(@directories) == 0 ){
-    pod2usage( { -verbose => 1,
-                 -message => "Use this script like this:\n"});
-}
+pod2usage(-verbose => 1) && exit if ( $help );
+pod2usage(-verbose => 2) && exit if ( $man );
+pod2usage({-verbose => 1, -message => "Use this script like this:\n"}) &&
+    exit if ( $help || scalar(@files) == 0 && scalar(@directories) == 0 );
 ###############################################################################
 #                 
 # Logger initiation  
@@ -67,11 +69,19 @@ my $logger = &configureLogger($verbose, $logger_name);
 
 $logger->info("++++ ".__FILE__." has been started. ++++");
 
+###############################################################################
+#
+# Load own perl modules
+#
+###############################################################################
+
+require RNAprobing::RDATFile;
+
 
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnamlFiles
 ##  - find all rna1.xml files in the @directories given and add them to @files
 if ( scalar(@directories ) != 0 ){
-    my @checked_directories = [];
+    my @checked_directories = ();
     foreach (@directories) {
 	if ( -d $_ ) {
 	    $logger->info("$_ is a directory");
@@ -84,7 +94,7 @@ if ( scalar(@directories ) != 0 ){
 	if ( scalar(@checked_directories) == 0 && scalar(@files) == 0 );
     $logger->info("Looking for rdat files in directories:\n".
 		  join("\n", @checked_directories));
-    find(\&wanted, @checked_directories);
+   find(\&wanted, @checked_directories);
 }
 
 ##  - check found files and add them to @rdat_files if they passed the checks
@@ -99,6 +109,7 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     my $fasta_file = $directories.$filename;
     $fasta_file =~ s/\.rdat$//g;
     my $rdat_object = RNAprobing::RDATFile->new($rdat_file);
+    $rdat_object->write_file($rdat_file.".test");
     my $sequence = $rdat_object->sequence();
     if ($to_dna) {
         $sequence =~ s/($regex)/$replace{$1}/g;
@@ -107,13 +118,13 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
         $fasta_file .= ".fa";
     }
     open(my $fasta_fh, ">", $fasta_file) or die("Can't open $fasta_file.");
-    print $fasta_fh ">".$filename."\n";
+    print $fasta_fh "> ".$filename."\n";
     print $fasta_fh $sequence."\n";
     close($fasta_fh);
 }
-
-$logger->info(join(";", @{ $rdat_files}));
-
+foreach my $i ( @{$rdat_files}) {
+    $logger->info("Processed RDAT file: ".$i);
+}
 ###############################################################
 ##              
 ##              Subroutine section
@@ -158,7 +169,6 @@ sub configureLogger{
     my $logger_name = shift;
     my $logger = get_logger($logger_name);
     $logger->info("Verbosity level: $verbose");
-    print Dumper($logger);
     SELECT:{
 	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
 	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
@@ -209,8 +219,11 @@ rdat2fasta.pl - Creating .fasta files fom .rdat files
 
 =head1 SYNOPSIS
 
-rdat2fasta.pl -f=</path/to/file> -v -v -v -t
+rdat2fasta.pl -f=</path/to/file> -d=</path/to/rdat-directory/> -v -t
 
+=head1 DESCRIPTION
+
+B<rdat2fasta.pl> takes RDAT files as input or searches given directories for them and converts them to FASTA files. The FASTA files are created within the same directory as the original RDAT files.
 
 =head1 OPTIONS
 
@@ -234,15 +247,13 @@ Increases verbosity level. Option can be given multiple times.
 
 =item -h, --help
 
-Prints this help page.
+Prints the help page.
+
+=item -m, --man
+
+Prints the manual page.
 
 =back
-
-
-=back
-=head1 DESCRIPTION
-B<This program> will read the given input file(s) and do something
-useful with the contents thereof.
 
 =cut
 

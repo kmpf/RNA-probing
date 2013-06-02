@@ -27,12 +27,7 @@ sub new {
     &comment($self);
     &mutpos($self);
 
-    &annotation_data($self);
-    &reactivity($self);
-    &reactivity_error($self);
-    &xsel_refine($self);
-    &seqpos_reactivity_map($self);
-    &scaled_reactivity($self);
+    &data($self);
 
     bless $self, $classname;
 
@@ -57,11 +52,12 @@ sub new {
 
 sub read_file {
     my ($self, $filename) = @_;
-    $self->filename( $filename );
+    $self->filename( $filename ) if ( defined $filename );
     
-    open ( my $rdat_file , "<", $self->filename() ) or croak "Couldn't open file $self->filename(). Error: $!";
+    open ( my $rdat_file , "<", $self->filename() ) or 
+	croak "Couldn't open file $self->filename(). Error: $!";
 
-    my ($name, $lines) = "";
+    my $lines = "";
 
     while (my $line = <$rdat_file>) {
 
@@ -89,16 +85,15 @@ sub read_file {
         }
     }
     close($rdat_file);
-    
-    my $data_object = RNAprobing::RDATFile::Data->new($lines);
-
-    $self->seqpos_reactivity_map( $self->seqpos(), $self->reactivity() );
-    $self->scaled_reactivity( $self->reactivity() );
+    $self->data()->read_data($lines);
+    foreach my $index ( @{$self->data()->indices()} ){
+	$self->seqpos_reactivity_map( $index, $self->seqpos() );
+    }
 
     if ( $self->rdat_version() == 0.24 ) {
         $logger->info("Correct version.");
     } else {
-        $logger->error("Incorrect Version. There may occur errors while parsing this file.");
+        $logger->error("Incorrect Version. There may occur errors while parsing ".$filename);
     }
 
     return $self;
@@ -123,38 +118,27 @@ sub write_file {
         $self->serialize_comment().
         $self->serialize_xsel().
         $self->serialize_mutpos().
-        $self->serialize_annotation_data().
-        $self->serialize_reactivity().
-        $self->serialize_reactivity_error().
-        $self->serialize_xsel_refine().
-#        $self->serialize_data_seqpos().
-        $self->serialize_trace().
-        $self->serialize_reads();
+	$self->serialize_data();
 
     open( my $rdat_file, ">", $self->filename() ) or 
 	croak( "Couldn't open file". $self->filename() );
     print($rdat_file  $file_content);
     close($rdat_file);
-    $logger->info($file_content);
 }
 
 
 # Construct section
 
 sub seqpos_reactivity_map {
-    my ($self, $seqpos, $reactivity) = @_;
-    my $method_key = "SEQPOS_REACTIVITY_MAP";
-
-    if ( defined $reactivity && defined $seqpos ){
-        foreach my $reac_entry ( @{$reactivity}){
-            push( @{$self->{$method_key}}, 
-                $self->_create_seqpos_reactivity_hash($seqpos, $reac_entry) );
-        }
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # hashes or just an empty array
+    my ($self, $index, $seqpos) = @_;
+    if ( defined $index ){
+	if ( @{$seqpos} ){
+	    return $self->data()->seqpos_reactivity_map($index, $seqpos);
+	} elsif ( !(defined $self->data()->seqpos_reactivity_map($index)) ) {
+	    return $self->data()->seqpos_reactivity_map($index);
+	}
+    } 
+    return $self->data()->seqpos_reactivity_map();
 }
 
 
@@ -385,38 +369,23 @@ sub serialize_mutpos{
     return $line;
 }
 
+sub data {
+    my ($self, $lines) = @_;
+    my $method_key = "DATA";
 
-################################################################################
-##
-##  Subroutine that creates SEQPOS => REACTIVITY hash
-##
-################################################################################
-
-sub _create_seqpos_reactivity_hash {
-    my ($self, $seqpos, $reac_entry) = (@_);
-#    my @seqpos_reactivity = ();
-    my %pos_reac = ();
-
-    if (defined $reac_entry && defined $seqpos ){
-        if ( scalar( @{$seqpos} ) == scalar( @{$reac_entry} ) ) {
-            for ( my $i = 0; $i < scalar( @{$seqpos} ); $i++ ) {
-                $pos_reac{ $seqpos->[$i] } = $reac_entry->[$i];
-            }
-        } else {
-            $logger->error("Line SEQPOS in ".$self->filename()." has ".scalar(@{ $seqpos })." entries.");
-            $logger->error("Line REACTIVITY in ".$self->filename()." has ".scalar(@{ $reac_entry })." entries.");
-            $logger->error("Both lines should have an identical number of entries.");
-            $logger->error("Check your .rdat file for consistency!");
-        }
+    if ( defined $lines){
+        $self->{$method_key} = RNAprobing::RDATFile::Data->new($lines);
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = RNAprobing::RDATFile::Data->new();
     }
-    return \%pos_reac;
+    return $self->{$method_key}; # returns a RNAprobing::RDATFile::Data object
 }
 
-sub _href_to_string{
-    my ($self, $href) = @_;
+sub serialize_data{
+    my ($self) = @_;
     my $line = "";
-    foreach my $key ( keys %{ $href } ) {
-        $line = " ".$key.":".$href->{$key};
+    if ( $self->data() ) {
+        $line = $self->data()->serialize_data()."\n";
     }
     return $line;
 }

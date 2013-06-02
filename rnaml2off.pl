@@ -49,6 +49,10 @@ GetOptions(
     "help|h" => \$help,
     "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
 
+pod2usage(-verbose => 1) && exit if ( $help );
+pod2usage(-verbose => 2) && exit if ( $man );
+pod2usage(-verbose => 1) && exit if ( scalar(@files) == 0 && scalar(@directories) == 0 );
+
 # allow coma seperated values as input
 @files = split(/,/,join(',',@files));
 @directories = split(/,/,join(',',@directories));
@@ -68,10 +72,6 @@ Log::Log4perl->init("$log4perl_conf");
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".$this_file." has been started. ++++");
-
-pod2usage(-verbose => 1) && exit if ( $help );
-pod2usage(-verbose => 1) && exit if ( scalar(@files) == 0 && scalar(@directories) == 0 );
-pod2usage(-verbose => 2) && exit if ( $man );
 
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnaml_files
 ##  - find all rna1.xml files in the @directories given and add them to @files
