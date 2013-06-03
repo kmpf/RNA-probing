@@ -26,7 +26,6 @@ sub new {
     &annotation($self);
     &comment($self);
     &mutpos($self);
-
     &data($self);
 
     bless $self, $classname;
@@ -60,7 +59,6 @@ sub read_file {
     my $lines = "";
 
     while (my $line = <$rdat_file>) {
-
         chomp( $line );
         my $comment = '^#|^\s*$';
         next if ($line =~ /$comment/ );
@@ -85,7 +83,7 @@ sub read_file {
         }
     }
     close($rdat_file);
-    $self->data()->read_data($lines);
+    $self->data($lines);
     foreach my $index ( @{$self->data()->indices()} ){
 	$self->seqpos_reactivity_map( $index, $self->seqpos() );
     }
@@ -379,6 +377,7 @@ sub data {
         $self->{$method_key} = RNAprobing::RDATFile::Data->new();
     }
     return $self->{$method_key}; # returns a RNAprobing::RDATFile::Data object
+    # or a undefined value
 }
 
 sub serialize_data{

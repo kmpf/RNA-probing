@@ -108,7 +108,8 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     my($filename, $directories, $suffix) = fileparse($rdat_file);
     my $fasta_file = $directories.$filename;
     $fasta_file =~ s/\.rdat$//g;
-    my $rdat_object = RNAprobing::RDATFile->new($rdat_file);
+    my $rdat_object = ();
+    $rdat_object = RNAprobing::RDATFile->new($rdat_file);
     $rdat_object->write_file($rdat_file.".test");
     my $sequence = $rdat_object->sequence();
     if ($to_dna) {
@@ -122,8 +123,10 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     print $fasta_fh $sequence."\n";
     close($fasta_fh);
 }
+my $j = 0;
 foreach my $i ( @{$rdat_files}) {
-    $logger->info("Processed RDAT file: ".$i);
+    $j++;
+    $logger->info($j.". processed RDAT file: ".$i);
 }
 ###############################################################
 ##              

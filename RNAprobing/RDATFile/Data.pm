@@ -8,7 +8,7 @@ print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
 my $logger = get_logger();
 
 sub new {
-    my ($classname, $name, $lines) = @_;
+    my ($classname, $lines) = @_;
     my $self = {};
 
     &indices($self);
@@ -67,7 +67,9 @@ sub read_data {
 
 sub serialize_data {
     my ($self) = @_;
-    my $anno_data, $reac, $reac_error, $xsel_refine, $seqpos, $trace, $reads;
+    my ($anno_data, $reac, $reac_error, $xsel_refine, $seqpos, $trace, $reads);
+    $anno_data = $reac = $reac_error = $xsel_refine =
+	$seqpos = $trace = $reads = "";
     foreach my $index ( @{$self->indices()} ){
 	$anno_data   .= $self->serialize_annotation_data($index);
 	$reac        .= $self->serialize_reactivity($index);
@@ -150,7 +152,7 @@ sub serialize_reactivity {
     my ($self, $index) = @_;
     if ( defined $index && @{$self->reactivity($index)} ) {
 	return "REACTIVITY:".$index."\t".
-	    join( "\t", @{$self->reactivity($index)} )."\n";   
+	    join( "\t", @{$self->reactivity($index)} )."\n";
     }
     $logger->error("Missing mandatory REACTIVITY entry.");
     $logger->error("RDAT output is erroneous.");
