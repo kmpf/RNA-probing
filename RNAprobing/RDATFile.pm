@@ -130,15 +130,13 @@ sub write_file {
 sub seqpos_reactivity_map {
     my ($self, $index, $seqpos) = @_;
     if ( defined $index ){
-	if ( @{$seqpos} ){
+	if ( ref $seqpos eq "ARRAY" ){
 	    return $self->data()->seqpos_reactivity_map($index, $seqpos);
-	} elsif ( !(defined $self->data()->seqpos_reactivity_map($index)) ) {
-	    return $self->data()->seqpos_reactivity_map($index);
 	}
-    } 
+	return $self->data()->seqpos_reactivity_map($index);
+    }
     return $self->data()->seqpos_reactivity_map();
 }
-
 
 ################################################################################
 ##
@@ -156,6 +154,10 @@ sub filename {
     }
     return $self->{$method_key}; # returns a scalar
 }
+
+#
+# ==== RDAT General section ====
+#
 
 sub rdat_version {
     my ($self, $rdat_version) = @_;
@@ -175,6 +177,15 @@ sub serialize_rdat_version {
     return $line;
 }
 
+#
+# ==== RDAT Construct section ==== 
+#
+
+# NAME
+# The name of the construct in the following format: "RNA system name, Source"
+# where source can be the organism or gene where the system is usually studied
+# (in some cases, one can be more relevant than the other).. If the RNA is of
+# synthetic origin, a source must still be specified.
 
 sub name {
     my ($self, $name) = @_;
@@ -199,6 +210,15 @@ sub serialize_name {
     }
 }
 
+# SEQUENCE
+# The sequence of the RNA molecule studied. The sequence of interest should be
+# in upper case, while auxiliary sequences (e.g. primer binding sites or barcodes)
+# are in lower case. Degenerate sequences describing populations of sequences
+# probed can be described with IUPAC codes (e.g. AGGAAAGGNNRNNAAGAA). This is
+# particularly useful when an experiment compares different sequences that are
+# expected to fold in the same structure, such as those found in the EteRNA
+# project.
+
 sub sequence {
     my ($self, $sequence) = @_;
     my $method_key = "SEQUENCE";
@@ -221,6 +241,11 @@ sub serialize_sequence {
         $logger->error("RDAT output is erroneous.");
     }
 }
+
+# STRUCTURE
+# A string describing the best known secondary structure model of the RNA of
+# interest, in dot bracket notation (e.g. "((....))"). Pseudoknots can be
+# included using "{}" curly braces (e.g "((..{.{))}.}").
 
 sub structure {
     my ($self, $structure) = @_;
@@ -245,6 +270,14 @@ sub serialize_structure {
     }
 }
 
+# OFFSET
+# Sometimes, the sequence studied is a sub-sequence from a bigger sequence (such
+# as the P4-P6 domain of the Tetrahymena ribozyme group I intron) and the bigger
+# sequence numbering scheme will want to be preserved. The offset then specifies
+# the number such that Pos = OrPos - OFFSET, where Pos is the position in the
+# subsequence and OrPos is the same position but in the numbering scheme of the
+# bigger sequence. Note that positions are always considered to be 1-indexed.
+
 sub offset {
     my ($self, $offset) = @_;
     my $method_key = "OFFSET";
@@ -263,6 +296,13 @@ sub serialize_offset {
     return $line;
 }
 
+# SEQPOS
+# A list of sequence positions and their respective residues that were probed in
+# the experiment. If OFFSET is defined, each position in SEQPOS must have OFFSET
+# already added to it (thus, a position OrPos defined in SEQPOS refers to position
+# Pos = OrPos - OFFSET in the sequence defined in SEQUENCE.). Positions in SEQPOS
+# are 1-indexed.
+
 sub seqpos {
     my ($self, $seqpos) = @_;
     my $method_key = "SEQPOS";
@@ -280,6 +320,10 @@ sub serialize_seqpos{
     my $line = "SEQPOS ".join( " ", @{ $self->seqpos() } )."\n";
     return $line;
 }
+
+# ANNOTATION
+# Annotations for this construct section. See the Annotations section below for
+# more details.
 
 sub annotation {
     my ($self, $annotation) = @_;
@@ -304,6 +348,9 @@ sub serialize_annotation{
     return $line;
 }
 
+# COMMENT
+# Free text comments for the construct.
+
 sub comment {
     my ($self, $comment) = @_;
     my $method_key = "COMMENT";
@@ -324,6 +371,12 @@ sub serialize_comment{
     }
     return $line;
 }
+
+# XSEL
+# List of tab-separated integers that specify the place in the traces used for
+# peak calling in the sequence assignment step of the analysis, used globally.
+# This and XSEL_REFINE (see Data Section description below) are mutually
+# exclusive and when provided with both, XSEL will be ignored.
 
 sub xsel {
     my ($self, $xsel) = @_;
@@ -346,6 +399,11 @@ sub serialize_xsel{
     return $line;
 }
 
+# MUTPOS
+# List of tab-separated values with size of the number of data lanes that
+# indicate which samples have been mutated and where (only single point mutations
+# are accepted in MUTPOS). WT indicates that there is no mutation on the sample.
+
 sub mutpos {
     my ($self, $mutpos) = @_;
     my $method_key = "MUTPOS";
@@ -367,6 +425,14 @@ sub serialize_mutpos{
     return $line;
 }
 
+#
+# ==== RDAT Data section ====
+#
+
+
+# Everything from the data section in an RDAT file is going into a new 
+# RNAprobing::RDATFile::Data object which can hold all information given there
+
 sub data {
     my ($self, $lines) = @_;
     my $method_key = "DATA";
@@ -387,6 +453,67 @@ sub serialize_data{
         $line = $self->data()->serialize_data()."\n";
     }
     return $line;
+}
+
+
+################################################################################
+##
+##  Mappings for RDAT contained information 
+##
+################################################################################
+
+sub seq_startpos {
+    my ($self) = @_;
+    my $startpos = "";
+    # 1 is used because sequence is 1-indexed
+    if ( $self->offset() =~ /\d+/ ) {
+	$startpos = 1 + $self->offset();
+    } else {
+	undef $startpos;
+    }
+    return $startpos;
+}
+
+sub seq_endpos {
+    my ($self) = @_;
+    my $endpos = "";
+    if ( defined $self->sequence() && $self->offset() =~ /\d+/ ) {
+	$endpos = length($self->sequence()) + $self->offset();
+    } else {
+	undef $endpos;
+    }
+    return $endpos;
+}
+
+# this mapping is creating a hash whose keys start at OFFSET and cover the
+# whole sequence, such that the keys of this hash and those of SEQPOS are
+# mapping towards the same base
+
+sub offset_sequence_map {
+    my ($self) = @_;
+    my $method_key = "O_S_MAP";
+
+    if ( defined $self->offset() && defined $self->sequence() ){
+	my $offset = $self->offset();
+	my @sequence = split(//, $self->sequence());
+	# 1 is used because sequence is 1-indexed
+	my $startpos = $self->seq_startpos();
+	my $endpos = $self->seq_endpos();
+	$logger->info("OFFSET = ".$offset);
+	$logger->info("Sequence length = ".scalar(@sequence));
+	$logger->info("Start position given OFFSET = ".$startpos);
+	$logger->info("End position given OFFSET = ".$endpos);
+	my $off_seq_map = {};
+	my $seq_index = 0;
+	for (my $i = $startpos; $i < $endpos; $i++ ) {
+	    $off_seq_map->{$i} = $sequence[$seq_index];
+	    $seq_index++;
+	}
+        $self->{$method_key} = $off_seq_map;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = {};
+    }
+    return $self->{$method_key}; # returns a hash reference
 }
 
 1;
