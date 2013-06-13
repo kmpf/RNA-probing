@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 #===============================================================================
 #
-#         FILE: rdat2fasta.pl
+#         FILE: rdat2csv.pl
 #
-#        USAGE: ./rdat2fasta.pl  
+#        USAGE: ./rdat2csv.pl  
 #
 #  DESCRIPTION: 
 #
@@ -110,19 +110,33 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     my @sequence = split(//, $rdat_object->sequence());
     my $startpos = $rdat_object->seq_startpos();
     my $endpos = $rdat_object->seq_endpos();
-    my $lines = "Position\t\n";
+    my $header = "Position\tNucleotide";
+    foreach my $index ( @{$rdat_object->data()->indices()} ) {
+	$header .= "\texpReac$index\tscaReac$index";
+    }
+    $header .= "\n";
+    my $lines = "";
     for (my $i = $startpos; $i < $endpos; $i++ ) {
 	$lines .= $i."\t".$rdat_object->offset_sequence_map()->{$i};
 	foreach my $index ( @{$rdat_object->data()->indices()} ) {
 	    if (defined $rdat_object->seqpos_reactivity_map($index)->{$i}){
 		$lines .= "\t"
 		    .$rdat_object->seqpos_reactivity_map($index)->{$i};
+	    } else {
+		$lines .= "\t"
+	    }
+	    if ( defined $rdat_object->seqpos_scaled_reactivity_map($index)->{$i}){
+		$lines .= "\t"
+		    .$rdat_object->seqpos_scaled_reactivity_map($index)->{$i};
+	    } else {
+		$lines .= "\t";
 	    }
 	}
 	$lines .= "\n";
     }
     $logger->info($lines);
     open(my $csv_fh, ">", $csv_file) or die("Can't open $csv_file.");
+    print $csv_fh $header;
     print $csv_fh $lines;
     close($csv_fh);
 }

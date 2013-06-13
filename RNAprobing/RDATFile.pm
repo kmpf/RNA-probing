@@ -29,12 +29,9 @@ sub new {
     &data($self);
 
     bless $self, $classname;
-
-    $self->read_file($filename) if ($filename ne "");
-
+    $self->read_file($filename) if (defined $filename && -e $filename);
     return $self;
 }
-
 ################################################################################
 ################################################################################
 ##
@@ -86,6 +83,7 @@ sub read_file {
     $self->data($lines);
     foreach my $index ( @{$self->data()->indices()} ){
 	$self->seqpos_reactivity_map( $index, $self->seqpos() );
+	$self->seqpos_scaled_reactivity_map( $index, $self->seqpos() );
     }
 
     if ( $self->rdat_version() == 0.24 ) {
@@ -136,6 +134,17 @@ sub seqpos_reactivity_map {
 	return $self->data()->seqpos_reactivity_map($index);
     }
     return $self->data()->seqpos_reactivity_map();
+}
+
+sub seqpos_scaled_reactivity_map {
+    my ($self, $index, $seqpos) = @_;
+    if ( defined $index ){
+	if ( ref $seqpos eq "ARRAY" ){
+	    return $self->data()->seqpos_scaled_reactivity_map($index, $seqpos);
+	}
+	return $self->data()->seqpos_scaled_reactivity_map($index);
+    }
+    return $self->data()->seqpos_scaled_reactivity_map();
 }
 
 ################################################################################
@@ -468,6 +477,7 @@ sub seq_startpos {
     # 1 is used because sequence is 1-indexed
     if ( $self->offset() =~ /\d+/ ) {
 	$startpos = 1 + $self->offset();
+	$logger->debug("Reactivity start position given OFFSET: $startpos");
     } else {
 	undef $startpos;
     }
@@ -479,6 +489,7 @@ sub seq_endpos {
     my $endpos = "";
     if ( defined $self->sequence() && $self->offset() =~ /\d+/ ) {
 	$endpos = length($self->sequence()) + $self->offset();
+	$logger->debug("Reactivity end position given OFFSET: $endpos");
     } else {
 	undef $endpos;
     }
@@ -491,8 +502,8 @@ sub seq_endpos {
 
 sub offset_sequence_map {
     my ($self) = @_;
-    my $method_key = "O_S_MAP";
-
+    my $method_key = "OFFSET_SEQUENCE_MAP";
+    return $self->{$method_key} if ( defined $self->{$method_key} );
     if ( defined $self->offset() && defined $self->sequence() ){
 	my $offset = $self->offset();
 	my @sequence = split(//, $self->sequence());

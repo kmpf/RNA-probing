@@ -22,6 +22,7 @@ sub new {
 
     &scaled_reactivity($self);
     &seqpos_reactivity_map($self);
+    &seqpos_scaled_reactivity_map($self);
     bless $self, $classname;
 
     $self->read_data($lines) if ( defined $lines );
@@ -174,7 +175,7 @@ sub scaled_reactivity {
 		push( @scaled_reac, 
 		      ($reac_value - $min_reac) / $reactivity_span );
 	    }
-	    $self->{$method_key}->{$index}, \@scaled_reac;
+	    $self->{$method_key}->{$index} = \@scaled_reac;
 	}  elsif ( !(defined $self->{$method_key}->{$index}) ) {
 	    $self->{$method_key}->{$index} = [];
 	}
@@ -338,6 +339,28 @@ sub seqpos_reactivity_map {
 	    $self->{$method_key}->{$index} =
 		$self->_create_seqpos_reactivity_hash($seqpos, 
 						      $self->reactivity($index));
+	} elsif ( !(defined $self->{$method_key}->{$index}) ) {
+	    $self->{$method_key}->{$index} = [];
+	}
+	return $self->{$method_key}->{$index}; # returns an array reference
+    } else {
+	if ( !(defined $self->{$method_key}) ) {
+	    $self->{$method_key} = {};
+	}
+	return $self->{$method_key};
+    }
+}
+
+sub seqpos_scaled_reactivity_map {
+    my ($self, $index, $seqpos) = @_;
+    my $method_key = "SEQPOS_SCALED_REACTIVITY_MAP";
+    if ( defined $index ) {
+	$self->indices( $index );
+	$seqpos = $self->seqpos($index) if ( @{$self->seqpos($index)} );
+	if ( scalar(@{$seqpos}) == scalar(@{$self->scaled_reactivity($index)}) ) {
+	    $self->{$method_key}->{$index} =
+		$self->_create_seqpos_reactivity_hash($seqpos, 
+						      $self->scaled_reactivity($index));
 	} elsif ( !(defined $self->{$method_key}->{$index}) ) {
 	    $self->{$method_key}->{$index} = [];
 	}
