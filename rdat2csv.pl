@@ -116,7 +116,7 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     }
     $header .= "\n";
     my $lines = "";
-    for (my $i = $startpos; $i < $endpos; $i++ ) {
+    for (my $i = $startpos; $i <= $endpos; $i++ ) {
 	$lines .= $i."\t".$rdat_object->offset_sequence_map()->{$i};
 	foreach my $index ( @{$rdat_object->data()->indices()} ) {
 	    if (defined $rdat_object->seqpos_reactivity_map($index)->{$i}){
