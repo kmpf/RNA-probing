@@ -136,12 +136,12 @@ my $blast_index = -1;
 
 for ( my $i = 0; $i < scalar( @{$blast_result_object->subject_id()} ); $i++ ) {
     $blast_index = $i 
-	if ( $blast_result_object->subject_id()->[$i] eq $off_object->fasta_id() );
+    if ( $blast_result_object->subject_id()->[$i] eq $off_object->fasta_id() );
 }
 
 if ( $blast_index == -1 ) {
     die("No line in ".$blast_result_object->filename().
-	" found with query ID: ".$off_object->fasta_id() );
+    " found with query ID: ".$off_object->fasta_id() );
 }
 
 my $query_id = $blast_result_object->query_id()->[$blast_index];
@@ -151,16 +151,16 @@ if ( $query_id eq $rdat_filename ) {
         is identical with the .radt filename ".$rdat_filename.".");
 } else {
     die("The subject ID ".$query_id." in "
-		   .$blast_result_object->filename()
-		   ." is not identical with the .rdat filename "
-		   .$rdat_filename." in ".$rdat_object->filename() );
+           .$blast_result_object->filename()
+           ." is not identical with the .rdat filename "
+           .$rdat_filename." in ".$rdat_object->filename() );
 }
 
 if ( $blast_result_object->mismatches()->[$blast_index] != 0 ||
      $blast_result_object->gap_openings()->[$blast_index] != 0 ) {
     die("The mapping of ".$blast_result_object->subject_id()->[$blast_index]
-	."onto ".$blast_result_object->query_id()->[$blast_index]
-	." contains gaps or mismatches.");
+    ."onto ".$blast_result_object->query_id()->[$blast_index]
+    ." contains gaps or mismatches.");
 }
                  
 ###############################################################################
@@ -243,22 +243,21 @@ foreach my $index ( @{$rdat_object->data()->indices()} ) {
     $pos_reac{$index} = {}
 }
 
-$logger->info("INDEX <= ".($seq_endpos - $seq_startpos));
 for (my $i = 0; $i < ($seq_endpos - $seq_startpos);  $i++ ) {
     # fill hash with keys eqaul sequence position in OFF file and
     # related reactivity from RDAT file
     $logger->info("$i. OFF: ".$off_object->sequence_one_indexed_map()->{$subject_start_off + $i}." ".($subject_start_off + $i) );
     $logger->info("$i. RDAT: ".$rdat_object->offset_sequence_map()->{$seq_startpos + $i}." ".($seq_startpos + $i) );
     if ( $off_object->sequence_one_indexed_map()->{$subject_start_off + $i} eq
-	 $rdat_object->offset_sequence_map()->{$seq_startpos + $i}) {
-	$pos_seq{$subject_start_off + $i} = 
-	    $rdat_object->offset_sequence_map()->{$seq_startpos + $i};
+        $rdat_object->offset_sequence_map()->{$seq_startpos + $i}) {
+        $pos_seq{$subject_start_off + $i} = 
+            $rdat_object->offset_sequence_map()->{$seq_startpos + $i};
     } else {
-	die("Sequence mapping went wrong.");
+    die("Sequence mapping went wrong.");
     }
     foreach my $index ( @{$rdat_object->data()->indices()} ) {
-	$pos_reac{$index}{$subject_start_off + $i} = 
-	    $rdat_object->seqpos_scaled_reactivity_map($index)->{$seq_startpos + $i};
+        $pos_reac{$index}{$subject_start_off + $i} = 
+            $rdat_object->seqpos_scaled_reactivity_map($index)->{$seq_startpos + $i};
     }
 }
 ###############################################################################
@@ -281,7 +280,7 @@ for (my $i = 0; $i < ($seq_endpos - $seq_startpos);  $i++ ) {
 if ( $rdf_out ){
     $logger->info("RDF/XML model is going to be created.");
     &generate_rdf_model(\%pos_seq, \%pos_reac, $subject_start_off,
-			$subject_end_off, $off_object, $rdat_object, $owl_file); 
+            $subject_end_off, $off_object, $rdat_object, $owl_file); 
 }
 
 
@@ -379,8 +378,16 @@ sub calculate_probability_from_rnaup_energies {
 
 sub generate_rdf_model {
     my ($pos_seq, $pos_reac, $seq_start, $seq_end, $off_object,
-	$rdat_object, $owl_file) = @_;
+    $rdat_object, $owl_file) = @_;
     my $logger = get_logger();
+#    $logger->debug(Dumper($pos_seq));
+#    $logger->debug(Dumper($pos_reac));
+#    $logger->debug(Dumper($seq_start));
+#    $logger->debug(Dumper($seq_end));
+#    $logger->debug(Dumper($off_object));
+#    $logger->debug(Dumper($rdat_object));
+#    $logger->debug(Dumper($owl_file));
+
     my $rdat_name = fileparse($rdat_object->filename());
     $rdat_name =~ s/\.rdat$//g;
     $logger->debug($rdat_name);
@@ -438,90 +445,88 @@ sub generate_rdf_model {
                 '#default' => "http://purl.org/rss/1.0/",
                 },
             ExpandQNames => 1);
-
         # HowTo parse a file into a model
         my $parser = RDF::Trine::Parser->new( 'rdfxml' );
         my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
-	my $model = $rdf->model();
-        $parser->parse_file_into_model( $base_uri, $owl_file, $model );
-	$logger->debug("$owl_file");
+        my $model = $rdf->model();
+        $parser->parse_file_into_model( $base_uri, $owl_file->stringify, $model );
         # populate the RDF graph
 
         foreach my $querypos ( keys(%{$pos_seq}) ) {
-	    # each nucleotide gets its node and ... 
-            my $nuc_uri = 'bioinf:'.$rdf_id.'/'
-		.$pos_seq{$querypos}.$querypos;
+        # each nucleotide gets its node and ... 
+            my $nuc_uri = 'bioinf:'.$rdf_id.'/'.$pos_seq{$querypos}.$querypos;
             $logger->debug("Nucleotide: $nuc_uri");
 
-	    # ... gets connected to its neighbours ...
+        # ... gets connected to its neighbours ...
             # isThreePrimeOf
 
-            if ( $querypos < $seq_end ) {
+            if ( $querypos < $seq_end-1 ) {
+                $logger->info($querypos." < ".$seq_end);
                 my $three_prime_nuc_uri = 'bioinf:'.$rdf_id.'/'
-		    .$pos_seq{$querypos+1}.($querypos+1);
+                    .$pos_seq{$querypos+1}.($querypos+1);
                 $rdf->assert_resource($three_prime_nuc_uri,
-				      $is_three_prime_of_uri, $nuc_uri);
+                      $is_three_prime_of_uri, $nuc_uri);
             }
 
             # isFivePrimeOf
 
             if ( $querypos > $seq_start ) {
                 my $five_prime_nuc_uri =  'bioinf:'.$rdf_id.'/'
-		    .$pos_seq{$querypos-1}.($querypos-1);
+                    .$pos_seq{$querypos-1}.($querypos-1);
                 $rdf->assert_resource($five_prime_nuc_uri,
-				      $is_five_prime_of_uri, $nuc_uri);
+                      $is_five_prime_of_uri, $nuc_uri);
             }
 
-	    # ... and gets a type ...
+        # ... and gets a type ...
             # type of nucleotide at position $querypos
 
             $rdf->assert_resource($nuc_uri, 'rdf:type', $adenosine_uri) 
-		if ( $pos_seq{$querypos} eq 'A');
+                if ( $pos_seq{$querypos} eq 'A');
             $rdf->assert_resource($nuc_uri, 'rdf:type', $cytidine_uri)
-		if ( $pos_seq{$querypos} eq 'C');
+                if ( $pos_seq{$querypos} eq 'C');
             $rdf->assert_resource($nuc_uri, 'rdf:type', $guanosine_uri)
-		if ( $pos_seq{$querypos} eq 'G');
+                if ( $pos_seq{$querypos} eq 'G');
             $rdf->assert_resource($nuc_uri, 'rdf:type', $uridine_uri)
-		if ( $pos_seq{$querypos} eq 'U');
+                if ( $pos_seq{$querypos} eq 'U');
             $rdf->assert_resource($nuc_uri, 'rdf:type', $ribonucleotide_uri)
-		if ( $pos_seq{$querypos} eq 'N');
+                if ( $pos_seq{$querypos} eq 'N');
 
-	    # ... and gets ALL its edges.
-	    # insert Watson-Crick, Hoogsteen or Sugar edges
-	    &insert_edge( $rdf, $nuc_uri, 'W' );
-	    &insert_edge( $rdf, $nuc_uri, 'H' );
-	    &insert_edge( $rdf, $nuc_uri, 'S' );
+            # ... and gets ALL its edges.
+            # insert Watson-Crick, Hoogsteen or Sugar edges
+            &insert_edge( $rdf, $nuc_uri, 'W' );
+            &insert_edge( $rdf, $nuc_uri, 'H' );
+            &insert_edge( $rdf, $nuc_uri, 'S' );
 
             # RNAupProbability for nucleotide at $querypos
 
 #            my $rna_up = $rdf->new_literal($querypos_rnaup_prob->{$querypos},
-#					   '', 'xsd:decimal');
+#                       '', 'xsd:decimal');
 #            $rdf->assert_literal($nuc_uri, $has_rnaup_unpaired_prob_uri, $rna_up);
 
             # ExperimentalUnpairedProbability for nucleotide at $querypos
 
-	    # add 1 because $i is 0-indexed but the keys are 1-indexed
+            # add 1 because $i is 0-indexed but the keys are 1-indexed
             my $reactivity = $pos_reac{$i + 1}->{$querypos};
             my $react_prob = $rdf->new_literal($reactivity, '', 'xsd:decimal');
             $rdf->assert_literal($nuc_uri, $has_exp_unpaired_prob_uri
-				 , $react_prob);
+                 , $react_prob);
         }
         
-	# insert all Leontis-Westhof base pairs and tertiary interactions
+    # insert all Leontis-Westhof base pairs and tertiary interactions
 
         for ( my $j = 0; $j < scalar( @{ $off_object->edges() } ); $j++) {
 
             my @edge = @{$off_object->edges()->[$i]};
-	    next if ($edge[1] < $seq_start || $seq_end < $edge[2] );
+            next if ($edge[1] < $seq_start || $seq_end < $edge[2] );
 
             if ( $edge[0] ne "LW" ) {
                 $logger->info("Unknown notation $edge[0] trying next line.");
                 next;
             }
             my $five_prime_nuc_uri = 'bioinf:'.$rdf_id.'/'
-		.$pos_seq{$edge[1]}.$edge[1];
+                .$pos_seq{$edge[1]}.$edge[1];
             my $three_prime_nuc_uri = 'bioinf:'.$rdf_id.'/'
-		.$pos_seq{$edge[2]}.$edge[2];
+                .$pos_seq{$edge[2]}.$edge[2];
             if ( $edge[3] =~ /^[ct!][WEHST][WEHST]$/ ) {
                 $edge[3] =~ /^([ct!])([WEHST])([WEHST])$/;
                 my $orientation = $1;
@@ -530,10 +535,10 @@ sub generate_rdf_model {
 
                 # insert TertiaryInteraction
                 if ( $orientation eq '!' && $five_prime_edge eq 'T' 
-		     && $three_prime_edge eq 'T') {
+                     && $three_prime_edge eq 'T') {
                     $rdf->assert_resource($five_prime_nuc_uri
-					  , $has_tertiary_interaction_with_uri
-					  , $three_prime_nuc_uri );
+                      , $has_tertiary_interaction_with_uri
+                      , $three_prime_nuc_uri );
                 } elsif ($orientation eq 'c' || $orientation eq 't' ) {
                     my $glycosidic_bond_orientation = ();
                     if ( $orientation eq "c" ){
@@ -541,41 +546,40 @@ sub generate_rdf_model {
                     } elsif ($orientation eq "t" ){
                         $glycosidic_bond_orientation = 'bioinf:Trans';
                     }
-		    next unless ( $five_prime_edge =~ /WEHS/ && 
-				  $three_prime_edge =~ /WEHS/ );
+                    next unless ( $five_prime_edge =~ /WEHS/ && 
+                        $three_prime_edge =~ /WEHS/ );
                     $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge,
-					  $is_paired_with_uri,
-					  $three_prime_nuc_uri.$three_prime_edge);
+                      $is_paired_with_uri,
+                      $three_prime_nuc_uri.$three_prime_edge);
                     $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge,
-					  $is_paired_with_uri,
-					  $five_prime_nuc_uri.$five_prime_edge );
+                      $is_paired_with_uri,
+                      $five_prime_nuc_uri.$five_prime_edge );
                     $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge,
-					  $has_glycosidic_bond_orientation_uri,
-					  $glycosidic_bond_orientation );
+                      $has_glycosidic_bond_orientation_uri,
+                      $glycosidic_bond_orientation );
                     $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge,
-					  $has_glycosidic_bond_orientation_uri,
-					  $glycosidic_bond_orientation );
+                      $has_glycosidic_bond_orientation_uri,
+                      $glycosidic_bond_orientation );
                 }
             }
             else {
                 $logger->error("The edge description $edge[3] can not be parsed.");
             }
-    
         }
 
 #        my $anno = $rdat_object->annotation_data()->[$i];
 #        print Dumper($anno );
 #        print Dumper($anno->chemicals() );
 
-	my $rdf_filename = $rdf_id.".$i.rdf";
-	$logger->info("RDF file: $rdf_filename");
-        open (my $rdf_fh, ">", $rdf_filename) or die("Can't open $rdf_filename.");
-        my $string = $rdf->serialize( format => 'rdfxml');
-        # my $string = $rdf->serialize( format => 'turtle');
-        # $logger->info("$string");
-        print $rdf_fh $string;
-        close $rdf_fh;
-	$logger->info("Wrote $rdf_filename");
+       my $rdf_filename = $rdf_id.".$i.rdf";
+       $logger->info("RDF file: $rdf_filename");
+       open (my $rdf_fh, ">", $rdf_filename) or die("Can't open $rdf_filename.");
+       my $string = $rdf->serialize( format => 'rdfxml');
+       # my $string = $rdf->serialize( format => 'turtle');
+       # $logger->info("$string");
+       print $rdf_fh $string;
+       close $rdf_fh;
+       $logger->info("Wrote $rdf_filename");
 
     }
 
@@ -667,10 +671,10 @@ sub configureLogger{
     my $logger = get_logger($logger_name);
     $logger->info("Verbosity level: $verbose");
     SELECT:{
-	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
-	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
-	    if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
-	    else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
+        if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+        if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
+        if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
+        else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
     }
     return $logger;
 }
