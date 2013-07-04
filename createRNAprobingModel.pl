@@ -243,7 +243,7 @@ foreach my $index ( @{$rdat_object->data()->indices()} ) {
     $pos_reac{$index} = {}
 }
 
-for (my $i = 0; $i < ($seq_endpos - $seq_startpos);  $i++ ) {
+for (my $i = 0; $i <= ($seq_endpos - $seq_startpos);  $i++ ) {
     # fill hash with keys eqaul sequence position in OFF file and
     # related reactivity from RDAT file
     $logger->info("$i. OFF: ".$off_object->sequence_one_indexed_map()->{$subject_start_off + $i}." ".($subject_start_off + $i) );
@@ -380,14 +380,6 @@ sub generate_rdf_model {
     my ($pos_seq, $pos_reac, $seq_start, $seq_end, $off_object,
     $rdat_object, $owl_file) = @_;
     my $logger = get_logger();
-#    $logger->debug(Dumper($pos_seq));
-#    $logger->debug(Dumper($pos_reac));
-#    $logger->debug(Dumper($seq_start));
-#    $logger->debug(Dumper($seq_end));
-#    $logger->debug(Dumper($off_object));
-#    $logger->debug(Dumper($rdat_object));
-#    $logger->debug(Dumper($owl_file));
-
     my $rdat_name = fileparse($rdat_object->filename());
     $rdat_name =~ s/\.rdat$//g;
     $logger->debug($rdat_name);
@@ -460,8 +452,8 @@ sub generate_rdf_model {
         # ... gets connected to its neighbours ...
             # isThreePrimeOf
 
-            if ( $querypos < $seq_end-1 ) {
-                $logger->info($querypos." < ".$seq_end);
+            if ( $querypos < $seq_end ) {
+#                $logger->info($querypos." < ".$seq_end);
                 my $three_prime_nuc_uri = 'bioinf:'.$rdf_id.'/'
                     .$pos_seq{$querypos+1}.($querypos+1);
                 $rdf->assert_resource($three_prime_nuc_uri,

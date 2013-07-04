@@ -205,19 +205,19 @@ sub sequence_one_indexed_map {
     my $method_key = "SEQUENCE_ONE_INDEXED_MAP";
     return $self->{$method_key} if ( defined $self->{$method_key} );
     if ( defined $self->sequence() ){
-	my @sequence = split(//, $self->sequence());
-	# 1 is used because sequence is 1-indexed
-	my $startpos = 1;
-	my $endpos = scalar(@sequence);
-	$logger->info("Sequence length = ".scalar(@sequence));
-	$logger->info("1-indexed start position = ".$startpos);
-	$logger->info("1-indexed end position = ".$endpos);
-	my $seq_oi_map = {};
-	my $seq_index = 0;
-	for (my $i = $startpos; $i < $endpos; $i++ ) {
-	    $seq_oi_map->{$i} = $sequence[$seq_index];
-	    $seq_index++;
-	}
+	    my @sequence = split(//, $self->sequence());
+	    # 1 is used because sequence is 1-indexed
+	    my $startpos = 1;
+	    my $endpos = scalar(@sequence);
+	    $logger->info("Sequence length = ".scalar(@sequence));
+	    $logger->info("1-indexed start position = ".$startpos);
+	    $logger->info("1-indexed end position = ".$endpos);
+	    my $seq_oi_map = {};
+	    my $seq_index = 0;
+    	for (my $i = $startpos; $i <= $endpos; $i++ ) {
+    	    $seq_oi_map->{$i} = $sequence[$seq_index];
+    	    $seq_index++;
+    	}
         $self->{$method_key} = $seq_oi_map;
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = {};
