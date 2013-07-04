@@ -62,7 +62,6 @@ pod2usage(-verbose => 1) && exit if ( scalar(@files) == 0 && scalar(@directories
 # Logger initiation  
 #                 
 ###############################################################################
-
 my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
@@ -71,7 +70,7 @@ Log::Log4perl->init("$log4perl_conf");
 # Get the logger
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
-$logger->info("++++ ".$this_file." has been started. ++++");
+$logger->info("++++ ".__FILE__." has been started. ++++");
 
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnaml_files
 ##  - find all rna1.xml files in the @directories given and add them to @files
@@ -210,7 +209,7 @@ foreach my $rnaml_file ( @{$rnaml_files} ){
             foreach my $key (@bpStart5p){
                 my @bpLW = @{ $bp{$key} };
                 ## insert opening and closing bracket for every standard Watson-Crick base pair
-                @dotBracket = &insertBrackets($bpLW[0], $bpLW[1], $bpLW[3], $bpLW[4], \@dotBracket, \@bracket_stack, $filename);
+                @dotBracket = &insertBrackets($bpLW[0], $bpLW[1], $bpLW[3], $bpLW[4], \@dotBracket, \@bracket_stack, $filename, $sequence);
                 @colSize = &colSizeUpdate($bpLW[0], $bpLW[1], $bpLW[2], \@colSize);
             }
             ## $dbString - is the output string of the Dot-Bracket notation
@@ -375,12 +374,16 @@ sub insertBrackets{
     my @dotBracket = @{$_[4]};
     my $bracket_stack = $_[5];
     my $filename = $_[6];
+    my @sequence = split("", $_[7]);
     my $bracket_type = 0;
     my %opening_brackets = ( 0 => '(', 1 => '[', 2 => '{', 3 => '<' );
     my %closing_brackets = ( 0 => ')', 1 => ']', 2 => '}', 3 => '>' );
+    
     $logger->debug("$pos5P $pos3P $edge5P $edge3P");
     $logger->debug("$dotBracket[$pos5P-1] $dotBracket[$pos3P-1]");
-    if ($edge5P eq 'W' && $edge3P eq 'W'){
+    if ($edge5P eq 'W' && $edge3P eq 'W' ||
+           $edge5P eq 'E' && $edge3P eq 'E' && $sequence[$pos5P-1] eq 'U' && $sequence[$pos3P-1] eq 'G' ||
+           $edge5P eq 'E' && $edge3P eq 'E' && $sequence[$pos5P-1] eq 'G' && $sequence[$pos3P-1] eq 'U') {
         for (my $i = 0; $i < scalar(@{$bracket_stack}); $i++ ) {
             $logger->debug("Bracket type is $i");
             $logger->debug("Bracket stack contains ".scalar(@{$bracket_stack})." element(s).");
@@ -553,7 +556,7 @@ sub ndb2lw{
         # N = Non-identified Edge
         if ($_[0] eq '.' || $_[0] eq '?' || $_[0] eq 'X' ){ return "N"; last SELECT; }
         # M = Triplets and higher multiplets
-        if ($_[0] eq '+' ){ return "M"; last SELECT; }
+#        if ($_[0] eq '+' ){ return "M"; last SELECT; }
         # T = Tertiary interactions
         if ($_[0] eq '!' ){ return "T"; last SELECT; }
         else { return $_[0] }

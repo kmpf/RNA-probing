@@ -50,6 +50,7 @@ require RNAprobing::RNAupFile;
 my $blast_result = "";
 my $csv = 0;
 my $help = 0;
+my $man = 0;
 my $off_file = "";
 my $rdat_file = "";
 my $rnaup_file = "";
@@ -58,18 +59,23 @@ my $owl_file =file(dirname(__FILE__), "RNAprobing.owl");
 my $verbose = 0;
 
 GetOptions(
-    "blastResults=s" => \$blast_result, # optional
-    "csv" => \$csv, #optional
-    "off=s" => \$off_file, #optional
-    "rdat=s" => \$rdat_file, #optional
-    "rnaup=s" => \$rnaup_file, #optional
+    "help|h" => \$help,
+    "man|m" => \$man,
+    "blastResults=s" => \$blast_result, # mandatory
+    "csv" => \$csv, # optional
+    "off=s" => \$off_file, # mandatory
+    "rdat=s" => \$rdat_file, # mandatory
+    "rnaup=s" => \$rnaup_file, # optional
     "rdf" => \$rdf_out, # optional
     "owl=s"=> \$owl_file, 
     "verbose|v+" => \$verbose, # optional
     );
 
-if ( $help || $off_file eq "" ) {
-# $rdat_file eq "" || $rnaup_file eq "" || $blast_result eq "" ){
+if ( $help ) {
+    pod2usage( -verbose => 1 ) && exit;
+} elsif ( $man ) {
+    pod2usage( -verbose => 2 ) && exit;
+} elsif ( $off_file eq "" || $rdat_file eq "" || $blast_result eq "" ){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
 }
@@ -171,8 +177,12 @@ my $subject_end_off      = $blast_result_object->subject_end()->[$blast_index];
 
 $logger->debug(".rdat query start: $query_start_rdat");
 $logger->debug(".rdat query end: $query_end_rdat");
+my $l = $query_end_rdat - $query_start_rdat + 1;
+$logger->debug("Length of match in RDAT: ". $l );
 $logger->debug(".off subject start: $subject_start_off");
 $logger->debug(".off subject end: $subject_end_off");
+$l = $subject_end_off - $subject_start_off + 1;
+$logger->debug("Length of match in OFF: ". $l);
 
 ## calculate the start and end positions in the rdat_offset number system
 # "- 1" is needed cause BLAST output has 1-indexed sequence positions
@@ -202,10 +212,14 @@ if ( $rdat_seqpos[$#rdat_seqpos] < $seq_endpos ) {
     $query_end_rdat -= $diff;
 }
 
-$logger->debug("New .off subject start: $subject_start_off");
-$logger->debug("New .off subject end: $subject_end_off");
 $logger->debug("New .rdat query start: $query_start_rdat");
 $logger->debug("New .rdat query end: $query_end_rdat");
+$l = $query_end_rdat - $query_start_rdat + 1;
+$logger->debug("New length of match in RDAT: ". $l);
+$logger->debug("New .off subject start: $subject_start_off");
+$logger->debug("New .off subject end: $subject_end_off");
+$l = $subject_end_off - $subject_start_off + 1;
+$logger->debug("New length of match in OFF: ". $l);
 $logger->debug("RDAT start position of reactivity: $seq_startpos");
 $logger->debug("RDAT end position of reactivity: $seq_endpos");
 
@@ -229,11 +243,12 @@ foreach my $index ( @{$rdat_object->data()->indices()} ) {
     $pos_reac{$index} = {}
 }
 
-for (my $i = 0; $i <= ($seq_endpos - $seq_startpos);  $i++ ) {
+$logger->info("INDEX <= ".($seq_endpos - $seq_startpos));
+for (my $i = 0; $i < ($seq_endpos - $seq_startpos);  $i++ ) {
     # fill hash with keys eqaul sequence position in OFF file and
     # related reactivity from RDAT file
-#    $logger->info("OFF: ".$off_object->sequence_one_indexed_map()->{$subject_start_off + $i}." ".($subject_start_off + $i) );
-#    $logger->info("RDAT: ".$rdat_object->offset_sequence_map()->{$seq_startpos + $i}." ".($seq_startpos + $i) );
+    $logger->info("$i. OFF: ".$off_object->sequence_one_indexed_map()->{$subject_start_off + $i}." ".($subject_start_off + $i) );
+    $logger->info("$i. RDAT: ".$rdat_object->offset_sequence_map()->{$seq_startpos + $i}." ".($seq_startpos + $i) );
     if ( $off_object->sequence_one_indexed_map()->{$subject_start_off + $i} eq
 	 $rdat_object->offset_sequence_map()->{$seq_startpos + $i}) {
 	$pos_seq{$subject_start_off + $i} = 
@@ -428,7 +443,7 @@ sub generate_rdf_model {
         my $parser = RDF::Trine::Parser->new( 'rdfxml' );
         my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
 	my $model = $rdf->model();
-        $parser->parse_file_into_model( $base_uri, '/home/hubert/Data/ontologies/RNAprobing.owl', $model );
+        $parser->parse_file_into_model( $base_uri, $owl_file, $model );
 	$logger->debug("$owl_file");
         # populate the RDF graph
 
@@ -687,7 +702,60 @@ sub checkFiles {
 
 __END__
 
-=h1
+=head1 NAME
+
+createRNAprobingModel.pl - combines the structure information of an OFF file with the probing information of a RDAT file, given a mapping in BLAST format 
+
+=head1 SYNOPSIS
+
+rdat2gel.pl [options] -f,--file F<rdat-file>
+
+=head1 DESCRIPTION
+
+This script creates a RDAT file, containing the results of I<in silico> probing experiment.
+To perform a probing reaction it needs to be provided with a RNA sequence stored in a FASTA file and the reactivity rules in a special file format that looks like this:
+
+
+=head1 OPTIONS
+
+=over 8
+    "rnaup=s" => \$rnaup_file, #optional
+
+=item B<-h, --help>       
+
+Display help message
+
+=item B<-m, --man>
+
+Display whole man page
+
+=item B<--blastResults>
+
+File containing the results of an alignment of the sequences from the RDAT file (see --rdat) and the OFF file (see --off).
+
+=item B<--off>
+
+OFF file containing the sequence and structure information of a RNA (normally extracted from NDB RNAML files)
+
+=item B<--rdat>
+
+RDAT file containing the probing information for a RNA (normally downloaded from the RMDB)
+
+=item B<--rdf>
+
+Flag that if set leads to the generation of the RDF model
+
+=item B<--owl>
+
+OWL file which will be included into the RDF model. By default uses "RNAprobing.owl" which is contained in the RNAprobing repository.
+
+=item B<-v, --verbose>
+
+Increases the verbosity level. Can be used multiple times (verbosest if used 3 or more times) 
+
+=back
 
 This script requires the modules RDF::Helper, Moose, Namespace::Autoclean (???)
 
+
+=cut
