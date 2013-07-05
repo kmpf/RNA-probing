@@ -248,8 +248,8 @@ for (my $i = 0; $i <= ($seq_endpos - $seq_startpos);  $i++ ) {
     # related reactivity from RDAT file
     $logger->info("$i. OFF: ".$off_object->sequence_one_indexed_map()->{$subject_start_off + $i}." ".($subject_start_off + $i) );
     $logger->info("$i. RDAT: ".$rdat_object->offset_sequence_map()->{$seq_startpos + $i}." ".($seq_startpos + $i) );
-    if ( $off_object->sequence_one_indexed_map()->{$subject_start_off + $i} eq
-        $rdat_object->offset_sequence_map()->{$seq_startpos + $i}) {
+    if ( uc($off_object->sequence_one_indexed_map()->{$subject_start_off + $i}) eq
+        uc($rdat_object->offset_sequence_map()->{$seq_startpos + $i}) ) {
         $pos_seq{$subject_start_off + $i} = 
             $rdat_object->offset_sequence_map()->{$seq_startpos + $i};
     } else {
@@ -424,6 +424,7 @@ sub generate_rdf_model {
     # Configure RDF::Helper
 
     for (my $i = 0; $i < scalar( @{$rdat_object->mutpos()} ); $i++ ) {
+        $logger->debug($rdat_object->mutpos()->[$i]);
         next if ( $rdat_object->mutpos()->[$i] ne "WT" );
 
         my $rdf = RDF::Helper->new(
@@ -441,7 +442,7 @@ sub generate_rdf_model {
         my $parser = RDF::Trine::Parser->new( 'rdfxml' );
         my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
         my $model = $rdf->model();
-        $parser->parse_file_into_model( $base_uri, $owl_file->stringify, $model );
+#        $parser->parse_file_into_model( $base_uri, $owl_file->stringify, $model );
         # populate the RDF graph
 
         foreach my $querypos ( keys(%{$pos_seq}) ) {

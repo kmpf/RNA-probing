@@ -38,7 +38,7 @@ use Pod::Usage;
 use Scalar::Util qw(blessed);
 # load my modules
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
+# $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
 require RNAprobing::RDATFile;
 require RNAprobing::OFFFile;
@@ -49,6 +49,7 @@ require RNAprobing::RNAupFile;
 my $rdf_file = "";
 my $pos = "";
 my $neg = "";
+my $owl_file =file(dirname(__FILE__), "RNAprobing.owl");
 my $verbose = 0;
 my $help = "";
 my $man = 0;
@@ -61,14 +62,21 @@ GetOptions(
     "help|h" => \$help,
     "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
 
+if ( $help ) {
+    pod2usage( -verbose => 1 ) && exit;
+} elsif ( $man ) {
+    pod2usage( -verbose => 2 ) && exit;
+} elsif ( $rdf_file eq "" ){
+    pod2usage( { -verbose => 1,
+                 -message => "Use this script like this:\n"});
+}
+
 ###############################################################################
 #                 
 # Logger initiation  
 #                 
 ###############################################################################
-my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
-my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 pod2usage(-verbose => 1) && exit if ( $help );
 pod2usage(-verbose => 1) && exit if ( ($rdf_file eq "") || ($pos eq "") );
@@ -165,6 +173,7 @@ open(my $conf_fh, ">", $conf_file) or die "Couldn't open file $conf_file. Error:
 print $conf_fh "// knowledge source
 ks.type = \"OWL File\"
 ks.fileName = \"$rdf_file\"
+ks.fileName = \"$owl_file\"
 lp.positiveExamples = {".join(",", @positive_list)."}
 lp.negativeExamples = {".join(",", @negative_list)."}";
 
@@ -258,32 +267,45 @@ __END__
 
 =head1 NAME
 
-SPARQLqueryRDF.pl - Querys a RDF model
+makeDLLconf.pl - Querys a RDF model
 
 =head1 SYNOPSIS
 
-SPARQLqueryRDF.pl -f=</path/to/file> -v -v -v -t
+makeDLLconf.pl -f=</path/to/file> -v -v -v -t
 
 
 =head1 OPTIONS
 
 =over 4
 
-=item -f, --file=</path/to/file>
+    "neg=s" => \$neg,
+    "verbose|v+" => \$verbose,
+    "help|h" => \$help,
+    "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
 
-RDAT file(s) to be converted to FASTA files
+=item --rdf=</path/to/file>
 
-=item -t, --toDNA
+RDF file containing the RDF model
 
-if set convert RNA sequences are converted into DNA sequences
+=item --pos=</path/to/file>
+
+File containing a SPARQL query that returns the positive set of nodes from the RDF model
+
+=item --neg=</path/to/file>
+
+File containing a SPARQL query that returns the negative set of nodes from the RDF model
 
 =item -v, --verbose
 
-verbosity level increases by multiple times option given
+Verbosity level increases by multiple times option given
 
 =item -h, --help
 
-prints this help page
+Prints this help page
+
+=item -m, --man
+
+Prints the complete man page
 
 =back
 
