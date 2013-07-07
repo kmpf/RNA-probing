@@ -109,7 +109,9 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     my $rdat_object = RNAprobing::RDATFile->new($rdat_file);
     my @sequence = split(//, $rdat_object->sequence());
     my $startpos = $rdat_object->seq_startpos();
+    $logger->debug("Startpos: ".$startpos." nt: ".$rdat_object->offset_sequence_map()->{$startpos});
     my $endpos = $rdat_object->seq_endpos();
+    $logger->debug("Endpos: ".$endpos." nt: ".$rdat_object->offset_sequence_map()->{$endpos});
     my $header = "Position\tNucleotide";
     foreach my $index ( @{$rdat_object->data()->indices()} ) {
 	$header .= "\texpReac$index\tscaReac$index";
@@ -117,22 +119,22 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     $header .= "\n";
     my $lines = "";
     for (my $i = $startpos; $i <= $endpos; $i++ ) {
-	$lines .= $i."\t".$rdat_object->offset_sequence_map()->{$i};
-	foreach my $index ( @{$rdat_object->data()->indices()} ) {
-	    if (defined $rdat_object->seqpos_reactivity_map($index)->{$i}){
-		$lines .= "\t"
-		    .$rdat_object->seqpos_reactivity_map($index)->{$i};
-	    } else {
-		$lines .= "\t"
+
+    	$lines .= $i."\t".$rdat_object->offset_sequence_map()->{$i};
+	    foreach my $index ( @{$rdat_object->data()->indices()} ) {
+	        if (defined $rdat_object->seqpos_reactivity_map($index)->{$i}){
+	         	$lines .= "\t".$rdat_object->seqpos_reactivity_map($index)->{$i};
+	        } else {
+    	    	$lines .= "\t"
+	        }
+	        if ( defined $rdat_object->seqpos_scaled_reactivity_map($index)->{$i}){
+	    	$lines .= "\t"
+	    	    .$rdat_object->seqpos_scaled_reactivity_map($index)->{$i};
+	        } else {
+	    	$lines .= "\t";
+	        }
 	    }
-	    if ( defined $rdat_object->seqpos_scaled_reactivity_map($index)->{$i}){
-		$lines .= "\t"
-		    .$rdat_object->seqpos_scaled_reactivity_map($index)->{$i};
-	    } else {
-		$lines .= "\t";
-	    }
-	}
-	$lines .= "\n";
+	    $lines .= "\n";
     }
     $logger->info($lines);
     open(my $csv_fh, ">", $csv_file) or die("Can't open $csv_file.");

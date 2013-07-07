@@ -139,10 +139,10 @@ sub seqpos_reactivity_map {
 sub seqpos_scaled_reactivity_map {
     my ($self, $index, $seqpos) = @_;
     if ( defined $index ){
-	if ( ref $seqpos eq "ARRAY" ){
-	    return $self->data()->seqpos_scaled_reactivity_map($index, $seqpos);
-	}
-	return $self->data()->seqpos_scaled_reactivity_map($index);
+	    if ( ref $seqpos eq "ARRAY" ){
+	        return $self->data()->seqpos_scaled_reactivity_map($index, $seqpos);
+	    }
+	    return $self->data()->seqpos_scaled_reactivity_map($index);
     }
     return $self->data()->seqpos_scaled_reactivity_map();
 }
@@ -487,11 +487,11 @@ sub seq_startpos {
 sub seq_endpos {
     my ($self) = @_;
     my $endpos = "";
-    if ( defined $self->sequence() && $self->offset() =~ /\d+/ ) {
-	$endpos = length($self->sequence()) + $self->offset();
-	$logger->debug("Reactivity end position given OFFSET: $endpos");
+    if ( defined $self->sequence() && $self->offset() =~ /[+-]?\d+/ ) {
+	    $endpos = length($self->sequence()) + $self->offset();
+	    $logger->debug("Reactivity end position given OFFSET: $endpos");
     } else {
-	undef $endpos;
+    	undef $endpos;
     }
     return $endpos;
 }
@@ -505,22 +505,22 @@ sub offset_sequence_map {
     my $method_key = "OFFSET_SEQUENCE_MAP";
     return $self->{$method_key} if ( defined $self->{$method_key} );
     if ( defined $self->offset() && defined $self->sequence() ){
-	my $offset = $self->offset();
-	my @sequence = split(//, $self->sequence());
-	# 1 is used because sequence is 1-indexed
-	my $startpos = $self->seq_startpos();
-	my $endpos = $self->seq_endpos();
-	$logger->info("OFFSET = ".$offset);
-	$logger->info("Sequence length = ".scalar(@sequence));
-	$logger->info("Start position given OFFSET = ".$startpos);
-	$logger->info("End position given OFFSET = ".$endpos);
-	my $off_seq_map = {};
-	my $seq_index = 0;
-	for (my $i = $startpos; $i < $endpos; $i++ ) {
-	    $off_seq_map->{$i} = $sequence[$seq_index];
-	    $seq_index++;
-	}
-        $self->{$method_key} = $off_seq_map;
+	    my $offset = $self->offset();
+	    my @sequence = split(//, $self->sequence());
+	    # 1 is used because sequence is 1-indexed
+	    my $startpos = $self->seq_startpos();
+	    my $endpos = $self->seq_endpos();
+	    $logger->info("OFFSET = ".$offset);
+	    $logger->info("Sequence length = ".scalar(@sequence));
+	    $logger->info("Start position given OFFSET = ".$startpos);
+	    $logger->info("End position given OFFSET = ".$endpos);
+	    my $off_seq_map = {};
+	    my $seq_index = 0;
+	    for (my $i = $startpos; $i <= $endpos; $i++ ) {
+	        $off_seq_map->{$i} = $sequence[$seq_index];
+	        $seq_index++;
+	    }
+            $self->{$method_key} = $off_seq_map;
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = {};
     }

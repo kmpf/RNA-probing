@@ -24,6 +24,8 @@ use warnings;
 use feature "switch";
 use Data::Dumper;
 use File::Basename;
+use File::Spec;
+use File::HomeDir;
 use Getopt::Long;
 use Image::Magick;
 use List::Util qw(first max maxstr min minstr reduce shuffle sum);
@@ -157,7 +159,7 @@ if ( $neg_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
       foreach my $key ( @vars) {
         my $neg_element = $row->{ $key }->as_string;
         $neg_element =~ s/[<>]/"/g;
-        $logger->info($neg_element);
+#        $logger->info($neg_element);
         push(@negative_list, $neg_element);
       }
     }
@@ -167,16 +169,40 @@ my $pos_query_name = fileparse( $pos );
 $pos_query_name =~ s/\.sparql$//g;
 my $conf_file = $rdf_file;
 $conf_file =~ s/\.rdf$/\.$pos_query_name\.conf/g;
+my($filename, $directories, $suffix) = fileparse($rdf_file);
+my $abs_path = File::Spec->rel2abs( $directories ) ;
+
+$rdf_file = $abs_path.$filename.$suffix;
+
+my $conf_content = "";
+$conf_content .= "// knowledge source\n".
+                 "ks1.type = \"OWL File\"\n".
+                 "ks1.fileName = \"$rdf_file\"\n".
+                 "ks2.type = \"OWL File\"\n".
+                 "ks2.fileName = \"$owl_file\"\n\n".
+                 "// reasoner\n".
+                 "reasoner.type = \"fast instance checker\"\n".
+                 "reasoner.sources = { ks }\n\n".
+                 "// learning problem\n".
+                 "lp.type = \"posNegStandard\"\n".
+                 "lp.accuracyMethod = \"fmeasure\"\n\n".
+                 "// learning algorithm\n".
+                 "h.type =\"celoe_heuristic\"\n".
+                 "// h.expansionPenaltyFactor = 0.2\n".
+                 "h.expansionPenaltyFactor = 0.01\n\n".
+                 "op.type = \"rho\"\n".
+                 "op.useCardinalityRestrictions = true\n".
+                 "op.useNegation = true\n\n".
+                 "alg.type = \"celoe\"\n".
+                 "// alg.nrOfThreads = 6\n".
+                 "alg.maxExecutionTimeInSeconds = 500\n".
+                 "alg.noisePercentage = 30\n\n".
+                 "lp.positiveExamples = {".join(",", @positive_list)."}\n".
+                 "lp.negativeExamples = {".join(",", @negative_list)."}\n";
 
 
 open(my $conf_fh, ">", $conf_file) or die "Couldn't open file $conf_file. Error: $!";
-print $conf_fh "// knowledge source
-ks.type = \"OWL File\"
-ks.fileName = \"$rdf_file\"
-ks.fileName = \"$owl_file\"
-lp.positiveExamples = {".join(",", @positive_list)."}
-lp.negativeExamples = {".join(",", @negative_list)."}";
-
+print $conf_fh $conf_content;
 close $conf_fh;
 
 
@@ -271,27 +297,21 @@ makeDLLconf.pl - Querys a RDF model
 
 =head1 SYNOPSIS
 
-makeDLLconf.pl -f=</path/to/file> -v -v -v -t
-
+makeDLLconf.pl --rdf=</path/to/rdf-model> --pos=</path/to/pos-sparql-query> --neg--neg=</path/to/neg-sparql-query> -v -v -v
 
 =head1 OPTIONS
 
 =over 4
 
-    "neg=s" => \$neg,
-    "verbose|v+" => \$verbose,
-    "help|h" => \$help,
-    "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
-
-=item --rdf=</path/to/file>
+=item --rdf=</path/to/rdf-model>
 
 RDF file containing the RDF model
 
-=item --pos=</path/to/file>
+=item --pos=</path/to/pos-sparql-query>
 
 File containing a SPARQL query that returns the positive set of nodes from the RDF model
 
-=item --neg=</path/to/file>
+=item --neg=</path/to/neg-sparql-query>
 
 File containing a SPARQL query that returns the negative set of nodes from the RDF model
 
