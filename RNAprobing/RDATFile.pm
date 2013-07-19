@@ -147,6 +147,17 @@ sub seqpos_scaled_reactivity_map {
     return $self->data()->seqpos_scaled_reactivity_map();
 }
 
+sub seqpos_non_negative_reactivity_map {
+    my ($self, $index, $seqpos) = @_;
+    if ( defined $index ){
+	    if ( ref $seqpos eq "ARRAY" ){
+	        return $self->data()->seqpos_non_negative_reactivity_map($index, $seqpos);
+	    }
+	    return $self->data()->seqpos_non_negative_reactivity_map($index);
+    }
+    return $self->data()->seqpos_non_negative_reactivity_map();
+}
+
 ################################################################################
 ##
 ##  Getter/Setter subroutines 

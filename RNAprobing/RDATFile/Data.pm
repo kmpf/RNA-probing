@@ -21,6 +21,7 @@ sub new {
     &reads($self);
 
     &scaled_reactivity($self);
+    &non_negative_reactivity($self);
     &seqpos_reactivity_map($self);
     &seqpos_scaled_reactivity_map($self);
     bless $self, $classname;
@@ -160,15 +161,16 @@ sub serialize_reactivity {
     return "";
 }
 
-sub scaled_reactivity {
+sub non_negative_reactivity {
     my ($self, $index, $reactivity) = @_;
-    my $method_key = "SCALED_REACTIVITY";
+    my $method_key = "NON_NEGATIVE_REACTIVITY";
     if ( defined $index ){
         $self->indices( $index );
         if ( @{$reactivity} ) {
-    #        my $max_reac = max( @{$reactivity} );
-    #        my $min_reac = min( @{$reactivity} );
-    #        my $reactivity_span = $max_reac - $min_reac;
+#            my $max_reac = max( @{$reactivity} );
+#            my $min_reac = 0;
+#            my $min_reac = min( @{$reactivity} );
+#            my $reactivity_span = $max_reac - $min_reac;
             my @scaled_reac = ();
             # scale the entries in @{$aref}
             foreach my $reac_value ( @{$reactivity} ) {
@@ -176,6 +178,41 @@ sub scaled_reactivity {
                     push( @scaled_reac, '0' );
                 } else {
                     push( @scaled_reac, $reac_value );
+                }
+            }
+            $self->{$method_key}->{$index} = \@scaled_reac;
+        }  elsif ( !(defined $self->{$method_key}->{$index}) ) {
+            $self->{$method_key}->{$index} = [];
+        }
+        return $self->{$method_key}->{$index}; # returns an array reference
+    } else {
+        if ( !(defined $self->{$method_key}) ) {
+            $self->{$method_key} = {};
+        }
+        return $self->{$method_key};
+    }
+}
+
+# set negative reactivities to zero and set highest reactivity to one
+# scale everything in between accordingly
+sub scaled_reactivity {
+    my ($self, $index, $reactivity) = @_;
+    my $method_key = "SCALED_REACTIVITY";
+    if ( defined $index ){
+        $self->indices( $index );
+        if ( @{$reactivity} ) {
+            my $max_reac = max( @{$reactivity} );
+            my $min_reac = 0;
+#            my $min_reac = min( @{$reactivity} );
+            my $reactivity_span = $max_reac - $min_reac;
+            my @scaled_reac = ();
+            # scale the entries in @{$aref}
+            foreach my $reac_value ( @{$reactivity} ) {
+                if ( $reac_value <= '0') {
+                    push( @scaled_reac, '0' );
+                } else {
+                    my $rv = $reac_value/$reactivity_span;
+                    push( @scaled_reac, $rv );
                 }
             }
             $self->{$method_key}->{$index} = \@scaled_reac;
@@ -351,6 +388,29 @@ sub seqpos_reactivity_map {
             $self->{$method_key} = {};
         }
         return $self->{$method_key};
+    }
+}
+
+
+sub seqpos_non_negative_reactivity_map {
+    my ($self, $index, $seqpos) = @_;
+    my $method_key = "SEQPOS_NON_NEGATIVE_REACTIVITY_MAP";
+    if ( defined $index ) {
+        $self->indices( $index );
+        $seqpos = $self->seqpos($index) if ( @{$self->seqpos($index)} );
+        if ( scalar(@{$seqpos}) == scalar(@{$self->non_negative_reactivity($index)}) ) {
+            $self->{$method_key}->{$index} =
+                $self->_create_seqpos_reactivity_hash($seqpos, 
+                                  $self->non_negative_reactivity($index));
+            } elsif ( !(defined $self->{$method_key}->{$index}) ) {
+                $self->{$method_key}->{$index} = [];
+            }
+            return $self->{$method_key}->{$index}; # returns an array reference
+        } else {
+            if ( !(defined $self->{$method_key}) ) {
+                $self->{$method_key} = {};
+            }
+            return $self->{$method_key};
     }
 }
 

@@ -142,9 +142,9 @@ for (my $i = 0; $i < @{$rdat_files}; $i++ ){
 	        } else {
     	    	$lines .= "\t"
 	        }
-	        if ( defined $rdat_object->seqpos_scaled_reactivity_map($index)->{$i}){
+	        if ( defined $rdat_object->seqpos_non_negative_reactivity_map($index)->{$i}){
 	    	$lines .= "\t"
-	    	    .$rdat_object->seqpos_scaled_reactivity_map($index)->{$i};
+	    	    .$rdat_object->seqpos_non_negative_reactivity_map($index)->{$i};
 	        } else {
 	    	$lines .= "\t";
 	        }
