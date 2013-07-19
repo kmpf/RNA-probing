@@ -24,6 +24,7 @@ use warnings;
 use feature "switch";
 use Data::Dumper;
 use File::Basename;
+use File::Spec;
 use Getopt::Long;
 use Image::Magick;
 use List::Util qw(first max maxstr min minstr reduce shuffle sum);
@@ -38,7 +39,7 @@ use Pod::Usage;
 use Scalar::Util qw(blessed);
 # load my modules
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
+# $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
 require RNAprobing::RDATFile;
 require RNAprobing::OFFFile;
@@ -49,6 +50,7 @@ require RNAprobing::RNAupFile;
 my $rdf_file = "";
 my $pos = "";
 my $neg = "";
+my $owl_file =file(dirname(__FILE__), "RNAprobing.owl");
 my $verbose = 0;
 my $help = "";
 my $man = 0;
@@ -57,18 +59,26 @@ GetOptions(
     "rdf=s" => \$rdf_file,
     "pos=s" => \$pos,
     "neg=s" => \$neg,
+    "owl=s" => \$owl_file,
     "verbose|v+" => \$verbose,
     "help|h" => \$help,
     "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
+
+if ( $help ) {
+    pod2usage( -verbose => 1 ) && exit;
+} elsif ( $man ) {
+    pod2usage( -verbose => 2 ) && exit;
+} elsif ( $rdf_file eq "" ){
+    pod2usage( { -verbose => 1,
+                 -message => "Use this script like this:\n"});
+}
 
 ###############################################################################
 #                 
 # Logger initiation  
 #                 
 ###############################################################################
-my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
-my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 pod2usage(-verbose => 1) && exit if ( $help );
 pod2usage(-verbose => 1) && exit if ( ($rdf_file eq "") || ($pos eq "") );
@@ -111,7 +121,7 @@ while (<$pos_sparql_fh>) {
 }
 close $pos_sparql_fh;
 
-&test($rdf);
+# &test($rdf);
 # my $positive_list = &query_model( $pos_sparql_query, $rdf );
 # my $negative_list= &query_model( $neg_sparql_query, $rdf );
 my @positive_list = ();
@@ -128,6 +138,7 @@ if ( $pos_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
       foreach my $key ( @vars) {
         my $pos_element = $row->{ $key }->as_string;
         $pos_element =~ s/[<>]/"/g;
+        $logger->info($pos_element);
         push(@positive_list, $pos_element);
       }
     }
@@ -160,14 +171,35 @@ $pos_query_name =~ s/\.sparql$//g;
 my $conf_file = $rdf_file;
 $conf_file =~ s/\.rdf$/\.$pos_query_name\.conf/g;
 
+my $conf_content = "";
+$conf_content .= "// knowledge sources\n".
+                 "ks1.type = \"OWL File\"\n".
+                 "ks1.fileName = \"$rdf_file\"\n".
+#                 "ks2.type = \"OWL File\"\n".
+#                 "ks2.fileName = \"$owl_file\"\n\n".
+                 "// reasoner\n".
+                 "reasoner.type = \"fast instance checker\"\n".
+                 "reasoner.sources = { ks1 }\n\n".
+                 "// learning problem\n".
+                 "lp.type = \"posNegStandard\"\n".
+                 "lp.accuracyMethod = \"fmeasure\"\n\n".
+                 "// learning algorithm\n".
+                 "h.type =\"celoe_heuristic\"\n".
+                 "// h.expansionPenaltyFactor = 0.2\n".
+                 "h.expansionPenaltyFactor = 0.01\n\n".
+                 "op.type = \"rho\"\n".
+                 "op.useCardinalityRestrictions = true\n".
+                 "op.useNegation = true\n\n".
+                 "alg.type = \"celoe\"\n".
+                 "// alg.nrOfThreads = 4\n".
+                 "alg.maxExecutionTimeInSeconds = 60\n".
+                 "alg.noisePercentage = 30\n\n".
+                 "lp.positiveExamples = {".join(",", @positive_list)."}\n".
+                 "lp.negativeExamples = {".join(",", @negative_list)."}\n";
 
+$logger->debug($conf_content);
 open(my $conf_fh, ">", $conf_file) or die "Couldn't open file $conf_file. Error: $!";
-print $conf_fh "// knowledge source
-ks.type = \"OWL File\"
-ks.fileName = \"$rdf_file\"
-lp.positiveExamples = {".join(",", @positive_list)."}
-lp.negativeExamples = {".join(",", @negative_list)."}";
-
+print $conf_fh $conf_content;
 close $conf_fh;
 
 
@@ -216,7 +248,7 @@ sub query_model {
     my ($sparql_query, $model) = @_;
 #    print Dumper($model);
     my $logger = get_logger();
-    &test($model);
+#    &test($model);
     my $result_list = "";
 
     if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
@@ -245,45 +277,44 @@ sub query_model {
     return $result_list;
 }
 
-sub test{
-    my $model = @_;
-    my $logger = get_logger();
-#    print Dumper($model);
-    $logger->info( blessed($model) );
-    return $model;
-}
-
 __END__
 
 
 =head1 NAME
 
-SPARQLqueryRDF.pl - Querys a RDF model
+makeDLLconf.pl - Querys a RDF model
 
 =head1 SYNOPSIS
 
-SPARQLqueryRDF.pl -f=</path/to/file> -v -v -v -t
-
+makeDLLconf.pl --rdf=</path/to/rdf-model> --pos=</path/to/pos-sparql-query> --neg--neg=</path/to/neg-sparql-query> -v -v -v
 
 =head1 OPTIONS
 
 =over 4
 
-=item -f, --file=</path/to/file>
+=item --rdf=</path/to/rdf-model>
 
-RDAT file(s) to be converted to FASTA files
+RDF file containing the RDF model
 
-=item -t, --toDNA
+=item --pos=</path/to/pos-sparql-query>
 
-if set convert RNA sequences are converted into DNA sequences
+File containing a SPARQL query that returns the positive set of nodes from the RDF model
+
+=item --neg=</path/to/neg-sparql-query>
+
+File containing a SPARQL query that returns the negative set of nodes from the RDF model
 
 =item -v, --verbose
 
-verbosity level increases by multiple times option given
+Verbosity level increases by multiple times option given
 
 =item -h, --help
 
-prints this help page
+Prints this help page
+
+=item -m, --man
+
+Prints the complete man page
 
 =back
 

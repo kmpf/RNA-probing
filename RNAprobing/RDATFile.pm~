@@ -7,10 +7,13 @@ use List::Util qw(first max maxstr min minstr reduce shuffle sum);
 use Log::Log4perl qw(get_logger :levels);
 use Data::Dumper;
 require RNAprobing::RDATFile::Annotation;
+require RNAprobing::RDATFile::Data;
+
+print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
+my $logger = get_logger();
 
 sub new {
-    my $classname = shift;
-    my $filename = shift;
+    my ($classname, $filename) = @_;
     my $self = {};
 
     &filename($self, $filename);
@@ -20,21 +23,15 @@ sub new {
     &structure($self);
     &offset($self);
     &seqpos($self);
-    &mutpos($self);
     &annotation($self);
     &comment($self);
-    &annotation_data($self);
-    &reactivity($self);
-    &reactivity_error($self);
-    &seqpos_reactivity_map($self);
-    &scaled_reactivity($self);
+    &mutpos($self);
+    &data($self);
 
-    bless( $self, $classname );
-
-#    $self->read_file($filename) if (defined $filename && -e $filename);
+    bless $self, $classname;
+    $self->read_file($filename) if (defined $filename && -e $filename);
     return $self;
 }
-
 ################################################################################
 ################################################################################
 ##
@@ -51,73 +48,103 @@ sub new {
 
 sub read_file {
     my ($self, $filename) = @_;
-    print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
-    my $logger = get_logger();
-    $self->filename( $filename );
+    $self->filename( $filename ) if ( defined $filename );
     
-    open ( my $rdat_file , "<", $self->filename() ) or croak "Couldn't open file $self->filename(). Error: $!";
+    open ( my $rdat_file , "<", $self->filename() ) or 
+	croak "Couldn't open file $self->filename(). Error: $!";
+
+    my $lines = "";
+
     while (my $line = <$rdat_file>) {
         chomp( $line );
         my $comment = '^#|^\s*$';
         next if ($line =~ /$comment/ );
         my @words = split(/\s+/, $line, 2);
         my @split = split( /\s+/, $words[1]);
+
+        # Construct section lines
         $self->rdat_version( $words[1] ) if ($words[0] =~ /^RDAT_VERSION$/);
-        $self->name( $words[1] ) if ($words[0] =~ /^NAME$/);
+	$self->name( $words[1] ) if ($words[0] =~ /^NAME$/);
         $self->sequence( $words[1] ) if ($words[0] =~ /^SEQUENCE$/);
         $self->structure( $words[1] ) if ($words[0] =~ /^STRUCTURE$/);
         $self->offset( $words[1] ) if ($words[0] =~ /^OFFSET$/);
         $self->seqpos( [@split] ) if ($words[0] =~ /^SEQPOS$/);
-        $self->mutpos( [@split] ) if ($words[0] =~ /^MUTPOS$/);
         $self->annotation( $words[1] ) if ($words[0] =~ /^ANNOTATION$/);
         $self->comment( $words[1]." " ) if ($words[0] =~ /^COMMENT$/);
-        $self->annotation_data( $words[1] ) if ($words[0] =~ /^ANNOTATION_DATA:(\d+)$/);
-        $self->reactivity( [@split] ) if ($words[0] =~ /^REACTIVITY:(\d+)$/);
-        $self->reactivity_error( [@split] ) if ($words[0] =~ /^REACTIVITY_ERROR:(\d+)$/);
-        
+        $self->xsel( [@split] ) if ($words[0] =~ /^XSEL$/);
+        $self->mutpos( [@split] ) if ($words[0] =~ /^MUTPOS$/);
+
+        # Collect data section lines
+        if ($words[0] =~ /^[\w]*:(\d+)$/) {
+            $lines .= $line."\n";
+        }
     }
     close($rdat_file);
-
-    
-    $self->seqpos_reactivity_map( $self->seqpos(), $self->reactivity() );
-    $self->scaled_reactivity( $self->reactivity() );
+    $self->data($lines);
+    foreach my $index ( @{$self->data()->indices()} ){
+	$self->seqpos_reactivity_map( $index, $self->seqpos() );
+	$self->seqpos_scaled_reactivity_map( $index, $self->seqpos() );
+    }
 
     if ( $self->rdat_version() == 0.24 ) {
         $logger->info("Correct version.");
     } else {
-        $logger->error("Incorrect Version. There may occur errors while parsing this file.");
+        $logger->error("Incorrect Version. There may occur errors while parsing ".$filename);
     }
 
     return $self;
 }
 
-
 ################################################################################
 ##
-##  Write subroutine
+##  Write file subroutine
 ##
 ################################################################################
 
 sub write_file {
     my ($self, $filename) = @_;
     $self->filename($filename) if (defined $filename);
-    my $logger = get_logger();
     my $file_content = $self->serialize_rdat_version().
         $self->serialize_name().
-        $self->serialize_sequence().
+	$self->serialize_sequence().
         $self->serialize_structure().
         $self->serialize_offset().
         $self->serialize_seqpos().
-        $self->serialize_mutpos().
         $self->serialize_annotation().
         $self->serialize_comment().
-        $self->serialize_annotation_data().
-        $self->serialize_reactivity().
-        $self->serialize_reactivity_error();
-    open( my $rdat_file, ">", $self->filename() ) or croak( "Couldn't open file". $self->filename() );
+        $self->serialize_xsel().
+        $self->serialize_mutpos().
+	$self->serialize_data();
+
+    open( my $rdat_file, ">", $self->filename() ) or 
+	croak( "Couldn't open file". $self->filename() );
     print($rdat_file  $file_content);
     close($rdat_file);
-    $logger->info($file_content);
+}
+
+
+# Construct section
+
+sub seqpos_reactivity_map {
+    my ($self, $index, $seqpos) = @_;
+    if ( defined $index ){
+	if ( ref $seqpos eq "ARRAY" ){
+	    return $self->data()->seqpos_reactivity_map($index, $seqpos);
+	}
+	return $self->data()->seqpos_reactivity_map($index);
+    }
+    return $self->data()->seqpos_reactivity_map();
+}
+
+sub seqpos_scaled_reactivity_map {
+    my ($self, $index, $seqpos) = @_;
+    if ( defined $index ){
+	    if ( ref $seqpos eq "ARRAY" ){
+	        return $self->data()->seqpos_scaled_reactivity_map($index, $seqpos);
+	    }
+	    return $self->data()->seqpos_scaled_reactivity_map($index);
+    }
+    return $self->data()->seqpos_scaled_reactivity_map();
 }
 
 ################################################################################
@@ -137,6 +164,10 @@ sub filename {
     return $self->{$method_key}; # returns a scalar
 }
 
+#
+# ==== RDAT General section ====
+#
+
 sub rdat_version {
     my ($self, $rdat_version) = @_;
     my $method_key = "RDAT_VERSION";
@@ -155,11 +186,21 @@ sub serialize_rdat_version {
     return $line;
 }
 
+#
+# ==== RDAT Construct section ==== 
+#
+
+# NAME
+# The name of the construct in the following format: "RNA system name, Source"
+# where source can be the organism or gene where the system is usually studied
+# (in some cases, one can be more relevant than the other).. If the RNA is of
+# synthetic origin, a source must still be specified.
+
 sub name {
     my ($self, $name) = @_;
     my $method_key = "NAME";
 
-    if ( defined $name){
+    if ( defined $name ){
         $self->{$method_key} = $name;
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = "";
@@ -169,9 +210,23 @@ sub name {
 
 sub serialize_name {
     my $self = shift;
-    my $line = "NAME ".$self->name()."\n";
-    return $line;
+    if ( $self->name() ){
+        my $line = "NAME ".$self->name()."\n";
+        return $line;
+    } else {
+        $logger->error("Missing mandatory NAME entry.");
+        $logger->error("RDAT output is erroneous.");
+    }
 }
+
+# SEQUENCE
+# The sequence of the RNA molecule studied. The sequence of interest should be
+# in upper case, while auxiliary sequences (e.g. primer binding sites or barcodes)
+# are in lower case. Degenerate sequences describing populations of sequences
+# probed can be described with IUPAC codes (e.g. AGGAAAGGNNRNNAAGAA). This is
+# particularly useful when an experiment compares different sequences that are
+# expected to fold in the same structure, such as those found in the EteRNA
+# project.
 
 sub sequence {
     my ($self, $sequence) = @_;
@@ -187,14 +242,24 @@ sub sequence {
 
 sub serialize_sequence {
     my $self = shift;
-    my $line = "SEQUENCE ".$self->sequence()."\n";
-    return $line;
+    if ( $self->sequence() ){
+        my $line = "SEQUENCE ".$self->sequence()."\n";
+        return $line;
+    } else {
+        $logger->error("Missing mandatory SEQUENCE entry.");
+        $logger->error("RDAT output is erroneous.");
+    }
 }
+
+# STRUCTURE
+# A string describing the best known secondary structure model of the RNA of
+# interest, in dot bracket notation (e.g. "((....))"). Pseudoknots can be
+# included using "{}" curly braces (e.g "((..{.{))}.}").
 
 sub structure {
     my ($self, $structure) = @_;
     my $method_key = "STRUCTURE";
-
+    # might check for correct notation here
     if ( defined $structure){
         $self->{$method_key} = $structure;
     } elsif ( !( defined $self->{$method_key}) ) {
@@ -205,9 +270,22 @@ sub structure {
 
 sub serialize_structure {
     my $self = shift;
-    my $line = "STRUCTURE ".$self->structure()."\n";
-    return $line;
+    if ( $self->structure() ){
+        my $line = "STRUCTURE ".$self->structure()."\n";
+        return $line;
+    } else {
+        $logger->error("Missing mandatory STRUCTURE entry.");
+        $logger->error("RDAT output is erroneous.");
+    }
 }
+
+# OFFSET
+# Sometimes, the sequence studied is a sub-sequence from a bigger sequence (such
+# as the P4-P6 domain of the Tetrahymena ribozyme group I intron) and the bigger
+# sequence numbering scheme will want to be preserved. The offset then specifies
+# the number such that Pos = OrPos - OFFSET, where Pos is the position in the
+# subsequence and OrPos is the same position but in the numbering scheme of the
+# bigger sequence. Note that positions are always considered to be 1-indexed.
 
 sub offset {
     my ($self, $offset) = @_;
@@ -227,6 +305,13 @@ sub serialize_offset {
     return $line;
 }
 
+# SEQPOS
+# A list of sequence positions and their respective residues that were probed in
+# the experiment. If OFFSET is defined, each position in SEQPOS must have OFFSET
+# already added to it (thus, a position OrPos defined in SEQPOS refers to position
+# Pos = OrPos - OFFSET in the sequence defined in SEQUENCE.). Positions in SEQPOS
+# are 1-indexed.
+
 sub seqpos {
     my ($self, $seqpos) = @_;
     my $method_key = "SEQPOS";
@@ -245,23 +330,9 @@ sub serialize_seqpos{
     return $line;
 }
 
-sub mutpos {
-    my ($self, $mutpos) = @_;
-    my $method_key = "MUTPOS";
-
-    if ( defined $mutpos){
-        $self->{$method_key} = $mutpos;
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns an array reference
-}
-
-sub serialize_mutpos{
-    my $self = shift;
-    my $line = "MUTPOS ".join( " ", @{ $self->mutpos() } )."\n";
-    return $line;
-}
+# ANNOTATION
+# Annotations for this construct section. See the Annotations section below for
+# more details.
 
 sub annotation {
     my ($self, $annotation) = @_;
@@ -286,6 +357,9 @@ sub serialize_annotation{
     return $line;
 }
 
+# COMMENT
+# Free text comments for the construct.
+
 sub comment {
     my ($self, $comment) = @_;
     my $method_key = "COMMENT";
@@ -300,173 +374,157 @@ sub comment {
 
 sub serialize_comment{
     my $self = shift;
-    my $line = "COMMENT ".$self->comment()."\n";
+    my $line = "";
+    if ( $self->comment() ) {
+        $line = "COMMENT ".$self->comment()."\n";
+    }
     return $line;
 }
 
-sub annotation_data {
-    my ($self, $annotation_data) = @_;
-    my $method_key = "ANNOTATION_DATA";
+# XSEL
+# List of tab-separated integers that specify the place in the traces used for
+# peak calling in the sequence assignment step of the analysis, used globally.
+# This and XSEL_REFINE (see Data Section description below) are mutually
+# exclusive and when provided with both, XSEL will be ignored.
 
-    if ( defined $annotation_data){
-        push( @{$self->{$method_key}}, RNAprobing::RDATFile::Annotation->new($annotation_data) );
+sub xsel {
+    my ($self, $xsel) = @_;
+    my $method_key = "XSEL";
+
+    if ( defined $xsel){
+        $self->{$method_key} = $xsel;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = ();
+        $self->{$method_key} = [];
     }
-    return $self->{$method_key}; # returns a RNAprobing::RDATFile::Annotation
-                                 # object reference or an undefined value
+    return $self->{$method_key}; # returns an array reference
 }
 
-sub serialize_annotation_data{
+sub serialize_xsel{
     my $self = shift;
     my $line = "";
-    my $anno_data_nr = 0;
-    if (defined $self->annotation_data() ) {
-        foreach my $href ( @{ $self->annotation_data() }  ) {
-            $anno_data_nr++;
-            $line =  "ANNOTATION_DATA:".$anno_data_nr;
-            $line .= $href->serialize_annotation();
-        }
-        $line .= "\n";
+    if ( @{$self->xsel()} ) {
+        $line = "XSEL\t".join( "\t", @{ $self->xsel() } )."\n";
     }
     return $line;
 }
 
-sub reactivity {
-    my ($self, $reactivity) = @_;
-    my $method_key = "REACTIVITY";
-    if ( defined $reactivity){
-        push ( @{$self->{$method_key}}, $reactivity);
+# MUTPOS
+# List of tab-separated values with size of the number of data lanes that
+# indicate which samples have been mutated and where (only single point mutations
+# are accepted in MUTPOS). WT indicates that there is no mutation on the sample.
+
+sub mutpos {
+    my ($self, $mutpos) = @_;
+    my $method_key = "MUTPOS";
+
+    if ( defined $mutpos){
+        $self->{$method_key} = $mutpos;
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # arrays or just an empty array
+    return $self->{$method_key}; # returns an array reference
 }
 
-sub scaled_reactivity{
-    my ($self, $reactivity) = @_;
-    my $method_key = "SCALED_REACTIVITY";
-
-    if ( defined $reactivity ) {
-        foreach my $aref ( @{$reactivity} ) {
-            my $max_reac = max( @{$aref} );
-            my $min_reac = min( @{$aref} );
-            my $reactivity_span = $max_reac - $min_reac;
-            my @scaled_reac = ();
-            # scale the entries in @{$aref}
-            foreach my $reac_value (@{$aref}) {
-                push( @scaled_reac, 
-                      ($reac_value - $min_reac) / $reactivity_span );
-                
-            }
-            push( @{$self->{$method_key}}, \@scaled_reac);
-        }
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # arrays or just an empty array
-}
-
-sub serialize_reactivity{
+sub serialize_mutpos{
     my $self = shift;
     my $line = "";
-    my $reactivity_nr = 0;
-    foreach my $aref ( @{ $self->reactivity() }  ) {
-        $reactivity_nr++;
-        $line =  "REACTIVITY:".$reactivity_nr." ";
-        $line .=  join( " ", @{$aref} )."\n";
+    if ( @{$self->mutpos()} ) {
+        $line = "MUTPOS\t".join( "\t", @{ $self->mutpos() } )."\n";
     }
     return $line;
 }
 
-sub reactivity_error {
-    my ($self, $reactivity_error) = @_;
-    my $method_key = "REACTIVITY_ERROR";
+#
+# ==== RDAT Data section ====
+#
 
-    if ( defined $reactivity_error){
-        push( @{$self->{$method_key}}, $reactivity_error );
+
+# Everything from the data section in an RDAT file is going into a new 
+# RNAprobing::RDATFile::Data object which can hold all information given there
+
+sub data {
+    my ($self, $lines) = @_;
+    my $method_key = "DATA";
+
+    if ( defined $lines){
+        $self->{$method_key} = RNAprobing::RDATFile::Data->new($lines);
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
+        $self->{$method_key} = RNAprobing::RDATFile::Data->new();
     }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # arrays or just an empty array
+    return $self->{$method_key}; # returns a RNAprobing::RDATFile::Data object
+    # or a undefined value
 }
 
-sub serialize_reactivity_error{
-    my $self = shift;
+sub serialize_data{
+    my ($self) = @_;
     my $line = "";
-    my $reactivity_error_nr = 0;
-    foreach my $aref ( @{ $self->reactivity_error() }  ) {
-        $reactivity_error_nr++;
-        $line =  "REACTIVITY_ERROR:".$reactivity_error_nr;
-        $line .=  join( " ", @{$aref} )."\n";
+    if ( $self->data() ) {
+        $line = $self->data()->serialize_data()."\n";
     }
     return $line;
 }
-
-sub seqpos_reactivity_map {
-    my ($self, $seqpos, $reactivity) = @_;
-    my $method_key = "SEQPOS_REACTIVITY_MAP";
-
-    if ( defined $reactivity && defined $seqpos ){
-        foreach my $reac_entry ( @{$reactivity}){
-            push( @{$self->{$method_key}}, 
-                $self->_create_seqpos_reactivity_hash($seqpos, $reac_entry) );
-        }
-    } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = [];
-    }
-    return $self->{$method_key}; # returns an array reference to an array of
-                                 # hashes or just an empty array
-}
-
 
 
 ################################################################################
 ##
-##  Subroutine that creates SEQPOS => REACTIVITY hash
+##  Mappings for RDAT contained information 
 ##
 ################################################################################
 
-sub _create_seqpos_reactivity_hash {
-    my ($self, $seqpos, $reac_entry) = (@_);
-#    my @seqpos_reactivity = ();
-    my $logger = get_logger();
-    my %pos_reac = ();
-
-    if (defined $reac_entry && defined $seqpos ){
-        if ( scalar( @{$seqpos} ) == scalar( @{$reac_entry} ) ) {
-            for ( my $i = 0; $i < scalar( @{$seqpos} ); $i++ ) {
-                $pos_reac{ $seqpos->[$i] } = $reac_entry->[$i];
-            }
-        } else {
-            $logger->error("Line SEQPOS in ".$self->filename()." has ".scalar(@{ $seqpos })." entries.");
-            $logger->error("Line REACTIVITY in ".$self->filename()." has ".scalar(@{ $reac_entry })." entries.");
-            $logger->error("Both lines should have an identical number of entries.");
-            $logger->error("Check your .rdat file for consistency!");
-        }
+sub seq_startpos {
+    my ($self) = @_;
+    my $startpos = "";
+    # 1 is used because sequence is 1-indexed
+    if ( $self->offset() =~ /\d+/ ) {
+	$startpos = 1 + $self->offset();
+	$logger->debug("Reactivity start position given OFFSET: $startpos");
+    } else {
+	undef $startpos;
     }
-    return \%pos_reac;
+    return $startpos;
 }
 
-sub _href_to_string{
-    my ($self, $href) = @_;
-    my $line = "";
-    foreach my $key ( keys( %{ $href } ) ) {
-        $line = " ".$key.":".$href->{$key};
+sub seq_endpos {
+    my ($self) = @_;
+    my $endpos = "";
+    if ( defined $self->sequence() && $self->offset() =~ /[+-]?\d+/ ) {
+	    $endpos = length($self->sequence()) + $self->offset();
+	    $logger->debug("Reactivity end position given OFFSET: $endpos");
+    } else {
+    	undef $endpos;
     }
-    return $line;
+    return $endpos;
 }
 
-################################################################################
-#
-#                       RNAprobing::Annotation
-#
-################################################################################
+# this mapping is creating a hash whose keys start at OFFSET and cover the
+# whole sequence, such that the keys of this hash and those of SEQPOS are
+# mapping towards the same base
 
-#package RNAprobing::Annotation;
-
+sub offset_sequence_map {
+    my ($self) = @_;
+    my $method_key = "OFFSET_SEQUENCE_MAP";
+    return $self->{$method_key} if ( defined $self->{$method_key} );
+    if ( defined $self->offset() && defined $self->sequence() ){
+	    my $offset = $self->offset();
+	    my @sequence = split(//, $self->sequence());
+	    # 1 is used because sequence is 1-indexed
+	    my $startpos = $self->seq_startpos();
+	    my $endpos = $self->seq_endpos();
+	    $logger->info("OFFSET = ".$offset);
+	    $logger->info("Sequence length = ".scalar(@sequence));
+	    $logger->info("Start position given OFFSET = ".$startpos);
+	    $logger->info("End position given OFFSET = ".$endpos);
+	    my $off_seq_map = {};
+	    my $seq_index = 0;
+	    for (my $i = $startpos; $i < $endpos; $i++ ) {
+	        $off_seq_map->{$i} = $sequence[$seq_index];
+	        $seq_index++;
+	    }
+            $self->{$method_key} = $off_seq_map;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = {};
+    }
+    return $self->{$method_key}; # returns a hash reference
+}
 
 1;

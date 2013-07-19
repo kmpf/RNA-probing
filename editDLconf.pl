@@ -107,7 +107,7 @@ sub wanted {
             if (move( $file, $backup_file )) {
                 $logger->info("Created a backup file $backup_file of $file");
             } else {
-                $logger->info("Couldn't move $file to $backup_file: $!");
+                $logger->error("Couldn't move $file to $backup_file: $!");
                 next;
             }
             open(my $conf_file, ">", $file) or die "Couldn't write to $file";

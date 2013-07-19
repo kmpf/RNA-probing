@@ -3,10 +3,10 @@ package RNAprobing::BLASTresult;
 use strict;
 use warnings;
 use Log::Log4perl qw(get_logger :levels);
+use Data::Dumper;
 
 sub new {
-    my $classname = shift;
-    my $filename = shift;
+    my ($classname, $filename) = @_;
     my $self = {};
     my $logger = get_logger();
 
@@ -26,7 +26,7 @@ sub new {
     &bit_score($self);
 
     bless( $self, $classname );
-    $self->read_file($filename);
+    $self->read_file($filename) if ($filename ne "");
     return $self;
 }
 
@@ -51,8 +51,8 @@ sub read_file {
         die "Couldn't open file $self->filename(). Error: $!";
     while (my $line = <$blast_result>) {
         chomp( $line );
-        my $string = '^#';
-        next if ($line =~ /$string/);
+        my $comment = '^#';
+        next if ($line =~ /$comment/);
         my @columns = split(/\s+/, $line);
         $logger->debug(scalar(@columns));
         if ( scalar(@columns) == 12 ) {
@@ -76,7 +76,7 @@ sub read_file {
     }
     close( $blast_result );
 
-    $self->nr_of_entries();
+    $self->nr_of_entries($results_found);
     $self->query_id(\@query_ids);
     $self->subject_id(\@subject_ids);
     $self->percent_identity(\@percent_identities);
@@ -132,7 +132,7 @@ sub query_id {
     if ( defined $query_id){
         $self->{$method_key} = $query_id;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -143,7 +143,7 @@ sub subject_id {
     if ( defined $subject_id){
         $self->{$method_key} = $subject_id;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -154,7 +154,7 @@ sub percent_identity {
     if ( defined $percent_identity){
         $self->{$method_key} = $percent_identity;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -165,7 +165,7 @@ sub alignment_length {
     if ( defined $alignment_length){
         $self->{$method_key} = $alignment_length;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -176,7 +176,7 @@ sub mismatches {
     if ( defined $mismatches){
         $self->{$method_key} = $mismatches;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -187,7 +187,7 @@ sub gap_openings {
     if ( defined $gap_openings){
         $self->{$method_key} = $gap_openings;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -198,7 +198,7 @@ sub query_start {
     if ( defined $query_start){
         $self->{$method_key} = $query_start;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -209,7 +209,7 @@ sub query_end {
     if ( defined $query_end){
         $self->{$method_key} = $query_end;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -220,7 +220,7 @@ sub subject_start {
     if ( defined $subject_start) {
         $self->{$method_key} = $subject_start;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -231,7 +231,7 @@ sub subject_end {
     if ( defined $subject_end){
         $self->{$method_key} = $subject_end;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -242,7 +242,7 @@ sub e_value {
     if ( defined $e_value){
         $self->{$method_key} = $e_value;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
     return $self->{$method_key}; # returns an array reference
 }
@@ -253,9 +253,9 @@ sub bit_score {
     if ( defined $bit_score){
         $self->{$method_key} = $bit_score;
     } elsif ( !( defined $self->{$method_key}) ) {
-        $self->{$method_key} = "";
+        $self->{$method_key} = [];
     }
-    return $self->{$method_key}; # returns an array reference
+    return $self->{$method_key}; # returns an array reference}
 }
 
 1;

@@ -36,11 +36,6 @@ use Pod::Usage;
 use RNA;
 my $module_dir = dirname(__FILE__);
 push(@INC, $module_dir);
-#require RNAprobing;
-require RNAprobing::Chemical;
-require RNAprobing::RDATFile;
-require RNAprobing::RDATFile::Annotation;
-require RNAprobing::OFFFile;
 
 ################################################################################
 #
@@ -49,9 +44,9 @@ require RNAprobing::OFFFile;
 ################################################################################
 my $help = 0;
 my $man = 0;
-my $rdat_file ="";
-my $fasta_file = "";
-my $chemical_file = "";
+my $rdat_file;
+my $fasta_file;
+my $chemical_file;
 my $verbose = 0;
 
 GetOptions(
@@ -61,16 +56,17 @@ GetOptions(
     "chemical=s" => \$chemical_file,
     "verbose|v+" => \$verbose);
 
-if ( $help || !@ARGV){
+if ( $help || !( defined $fasta_file && defined $chemical_file) ){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
 } elsif ($man) {
     pod2usage( { -verbose => 2});
 }
 
+
 ###############################################################################
 #                 
-# Logger initiation  
+# Logger initiation
 #                 
 ###############################################################################
 my $this_file = __FILE__;
@@ -84,6 +80,13 @@ my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".__FILE__." has been started. ++++");
 
+# require RNAprobing classes just after logger initialization
+require RNAprobing::Chemical;
+require RNAprobing::RDATFile;
+require RNAprobing::RDATFile::Annotation;
+require RNAprobing::RDATFile::Data;
+require RNAprobing::OFFFile;
+
 ###############################################################################
 #                 
 # Program logic
@@ -92,53 +95,59 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 
 # Input needed is a FASTA file and a reactivity file
 my $fasta = RNAprobing::OFFFile->new($fasta_file);
+$logger->debug("Loaded Fasta file ".$fasta_file);
 my $chemical = RNAprobing::Chemical->new($chemical_file);
 
-my $sample_size = 2; # could be an option
+my $sample_size = 1000; # number of stochastic sampled RNA structures to probe 
+                      # could be an option
 my $seq = $fasta->sequence();
+$seq = uc($seq);
+$logger->debug($seq);
 my @probing_profile = (0) x length($seq);
 my $length = length(join("", @probing_profile));
 my @structures = &stochastic_sampling($seq, $sample_size);
 my @structure_description = &db2sd(@structures);
 foreach (@structures){
-    print( "Structure: ".$_."\n");
+    $logger->debug( "Structure: ".$_."\n");
 }
 foreach (@structure_description){
-    print( "Structure description: ".$_."\n");
+    $logger->debug( "Structure description: ".$_."\n");
 }
 
-@probing_profile = &simulate_probing(\@structure_description, \@probing_profile,
+@probing_profile = &simulate_probing(\@structure_description,
+				     \@probing_profile,
                                      $seq, $chemical);
 
 # === Result output ===
 # Should be logged instead of printed
 
-print("=== Results ===\n");
+$logger->info("=== Results ===");
 for (my $i = 0; $i < scalar(@structures); $i++) {
-    print("$i. Structure:\n$structures[$i]\n$structure_description[$i]\n");
+    $logger->info("$i. Structure:\n$structures[$i]\n$structure_description[$i]");
 }
-print(join("", @probing_profile)."\n");
+$logger->info(join("", @probing_profile));
 
 # === Assemble a RDAT file ===
 
-$rdat_file = $fasta->fasta_id()."_".$chemical->probe_name().".rdat";
-$logger->info("++++ ".$rdat_file." ++++");
-my $rdat_out = RNAprobing::RDATFile->new($rdat_file);
+my $fasta_id = $fasta->fasta_id();
+$fasta_id =~ s/\.\w*$//g;
+my $rdat_file_name = $fasta_id."_".$chemical->probe_name().".rdat";
+$rdat_file_name =~ s/\s//g;
+$logger->info("++++ ".$rdat_file_name." ++++");
+my $rdat_out = RNAprobing::RDATFile->new($rdat_file_name);
 
-$rdat_out->name($fasta->fasta_id()." probed with ".$chemical->probe_name());
+my $construct_name = $fasta->fasta_id()."_in_silico_probed_using_".$chemical->probe_name();
+
+$rdat_out->name($construct_name);
 $rdat_out->sequence($seq);
+
 my ($struct, $mfe) = RNA::fold($seq);  # predict mfe structure of $seq
 $rdat_out->structure($struct);
 $rdat_out->offset(0);
 my @seqpos = (1 .. length($seq));
 $rdat_out->seqpos( \@seqpos );
-$rdat_out->reactivity(\@probing_profile);
-#    &mutpos($self);
-#    &annotation($self);
-#    &comment($self);
-#    &annotation_data($self);
-#    &reactivity_error($self);
-
+$rdat_out->data()->reactivity(1, \@probing_profile); # 1 <- index
+#$logger->debug(Dumper($rdat_out));
 $rdat_out->write_file();
 
 ################################################################################

@@ -35,14 +35,14 @@ use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
+# $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
 require RNAprobing::RDATFile;
 require RNAprobing::OFFFile;
 require RNAprobing::BLASTresult;
 require RNAprobing::RNAupFile;
 
-################################################################################
+###############################################################################
 #
 # Options section
 #
@@ -57,6 +57,9 @@ GetOptions(
     "verbose|v+" => \$verbose);
 
 if ( $help ){
+    pod2usage( { -verbose => 1,
+                 -message => "Use this script like this:\n"});
+} elsif ( $rdf_file eq "" ){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
 }
@@ -146,5 +149,29 @@ __END__
 
 =h1
 
-This script requires the modules RDF::Helper, Moose, Namespace::Autoclean (???)
+clearRNAprobingModel.pl - Removes http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#hasExperimentalUnpairedProbability from RDF model
+
+=head1 SYNOPSIS
+
+clearRNAprobingModel.pl --rdf=</path/to/rdf-model> --pos=</path/to/pos-sparql-query> --neg--neg=</path/to/neg-sparql-query> -v -v -v
+
+=head1 OPTIONS
+
+=over 4
+
+=item --rdf=</path/to/rdf-model>
+
+RDF file containing the RDF model
+
+=item -v, --verbose
+
+Verbosity level increases by multiple times option given
+
+=item -h, --help
+
+Prints this help page
+
+=back
+
+=cut
 

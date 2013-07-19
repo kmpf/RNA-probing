@@ -49,6 +49,10 @@ GetOptions(
     "help|h" => \$help,
     "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
 
+pod2usage(-verbose => 1) && exit if ( $help );
+pod2usage(-verbose => 2) && exit if ( $man );
+pod2usage(-verbose => 1) && exit if ( scalar(@files) == 0 && scalar(@directories) == 0 );
+
 # allow coma seperated values as input
 @files = split(/,/,join(',',@files));
 @directories = split(/,/,join(',',@directories));
@@ -58,9 +62,7 @@ GetOptions(
 # Logger initiation  
 #                 
 ###############################################################################
-my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
-my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
@@ -68,46 +70,46 @@ Log::Log4perl->init("$log4perl_conf");
 # Get the logger
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
-$logger->info("++++ ".$this_file." has been started. ++++");
-
-pod2usage(-verbose => 1) && exit if ( $help );
-pod2usage(-verbose => 1) && exit if ( scalar(@files) == 0 && scalar(@directories) == 0 );
-pod2usage(-verbose => 2) && exit if ( $man );
+$logger->info("++++ ".__FILE__." has been started. ++++");
 
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnaml_files
 ##  - find all rna1.xml files in the @directories given and add them to @files
-foreach (@directories) {
-    if ( -d $_ ) {
-        $logger->info("$_ is a directory");
-        $logger->info("Looking for rna1.xml files in $_");
-        $logger->info( find( sub { push( @files, $File::Find::name) if ($_ =~ /rna1\.xml$/) }, $_) );
-    } else {
-        $logger->info("$_ isn't a directory");
+if ( scalar(@directories ) != 0 ){
+    my @checked_directories = [];
+    foreach (@directories) {
+	if ( -d $_ ) {
+	    $logger->info("$_ is a directory");
+	    push( @checked_directories, $_ );
+	} else {
+	    $logger->info("$_ isn't a directory");
+	}
     }
+    $logger->error("No valid directory given.") && exit 0 
+	if ( scalar(@checked_directories) == 0 && scalar(@files) == 0 );
+    $logger->info("Looking for rna1.xml files in directories:\n".
+		  join("\n", @checked_directories));
+    find(\&wanted, @checked_directories);
 }
 
 ##  - check found files and add them to @rnaml_files if they passed the checks
-my @rnaml_files = &checkFiles(@files);
+my $rnaml_files = &checkFiles(@files);
 
 ## Check for correct notation selection ##
 my $notation = "";
 if ($nota eq "LW") {
     $logger->info("Leontis-Westhof notation selected.");
     $notation = "LW";
-}
-if ($nota eq "BP" ) {
+} elsif ($nota eq "BP" ) {
     $logger->info("Base pair notation selected.");
     $notation = "BP";
-}
-if ($nota eq "LW+" ) {
+} elsif ($nota eq "LW+" ) {
     $logger->info("Leontis-Westhof notation with nucleotide/amino acid interactions selected.");
     $notation = "LW+";
-}
-if ($nota eq "LG" ) {
+} elsif ($nota eq "LG" ) {
     $logger->info("Lee-Guttel notation selected.");
     $notation = "LG";
-}
-else {
+} else {
+    $logger->info("Notation set to Leontis-Westhof.");
     $notation = "LW";
 }
 
@@ -122,7 +124,7 @@ my $xml = new XML::Simple;
 
 # parse XML files
 
-foreach my $rnaml_file ( @rnaml_files ){
+foreach my $rnaml_file ( @{$rnaml_files} ){
     ## $data - is the XML::Simple object that holds the representation of the RNAML file
     my $data = $xml->XMLin($rnaml_file, ForceArray => 1);
 
@@ -207,7 +209,7 @@ foreach my $rnaml_file ( @rnaml_files ){
             foreach my $key (@bpStart5p){
                 my @bpLW = @{ $bp{$key} };
                 ## insert opening and closing bracket for every standard Watson-Crick base pair
-                @dotBracket = &insertBrackets($bpLW[0], $bpLW[1], $bpLW[3], $bpLW[4], \@dotBracket, \@bracket_stack);
+                @dotBracket = &insertBrackets($bpLW[0], $bpLW[1], $bpLW[3], $bpLW[4], \@dotBracket, \@bracket_stack, $filename, $sequence);
                 @colSize = &colSizeUpdate($bpLW[0], $bpLW[1], $bpLW[2], \@colSize);
             }
             ## $dbString - is the output string of the Dot-Bracket notation
@@ -262,7 +264,7 @@ foreach my $rnaml_file ( @rnaml_files ){
 ###############################################################
 
 sub checkFiles {
-    my @testfiles = shift;
+    my @testfiles = @_;
     my @checkedfiles = ();
     my $logger = get_logger("RNAprobing");
 
@@ -283,7 +285,7 @@ sub checkFiles {
             $logger->error("$_ is a directory") if ( -d $_);
         }
     }
-    return @checkedfiles;
+    return \@checkedfiles;
 }
 
 ###############################################################################
@@ -371,12 +373,17 @@ sub insertBrackets{
     my $edge3P = $_[3];
     my @dotBracket = @{$_[4]};
     my $bracket_stack = $_[5];
+    my $filename = $_[6];
+    my @sequence = split("", $_[7]);
     my $bracket_type = 0;
     my %opening_brackets = ( 0 => '(', 1 => '[', 2 => '{', 3 => '<' );
     my %closing_brackets = ( 0 => ')', 1 => ']', 2 => '}', 3 => '>' );
+    
     $logger->debug("$pos5P $pos3P $edge5P $edge3P");
     $logger->debug("$dotBracket[$pos5P-1] $dotBracket[$pos3P-1]");
-    if ($edge5P eq 'W' && $edge3P eq 'W'){
+    if ($edge5P eq 'W' && $edge3P eq 'W' ||
+           $edge5P eq 'E' && $edge3P eq 'E' && $sequence[$pos5P-1] eq 'U' && $sequence[$pos3P-1] eq 'G' ||
+           $edge5P eq 'E' && $edge3P eq 'E' && $sequence[$pos5P-1] eq 'G' && $sequence[$pos3P-1] eq 'U') {
         for (my $i = 0; $i < scalar(@{$bracket_stack}); $i++ ) {
             $logger->debug("Bracket type is $i");
             $logger->debug("Bracket stack contains ".scalar(@{$bracket_stack})." element(s).");
@@ -390,14 +397,17 @@ sub insertBrackets{
                 $bracket_type = $i + 1;
                 last;
             } elsif ($pos5P < ${$bracket_stack}[$i] && $pos3P > ${$bracket_stack}[$i]) {
-                $logger->info("Detected pseudoknot crossing ".($i + 1)." edges.");
+                $logger->info("Detected pseudoknot.");
                 $bracket_type = $i + 1;
             } else {
-               $logger->error("Encountered a problem with the pseudoknot detection!");
+               $logger->error($filename.": Encountered a problem with the pseudoknot detection! Bracket stack:");
+	       $logger->error( Dumper($bracket_stack) );
+	       $logger->error($filename . ": 5' bp of edge: " . $pos5P);
+	       $logger->error($filename . ": 3' bp of edge: " . $pos3P);
             }
         }
         if ( $bracket_type > 3 ){
-            $logger->error("More than four entangled pseudoknots! HELP!");
+            $logger->error($filename.": More than four entangled pseudoknots! HELP!");
         } else {
             $dotBracket[$pos5P-1] = $opening_brackets{$bracket_type};
             $dotBracket[$pos3P-1] = $closing_brackets{$bracket_type};
@@ -546,7 +556,7 @@ sub ndb2lw{
         # N = Non-identified Edge
         if ($_[0] eq '.' || $_[0] eq '?' || $_[0] eq 'X' ){ return "N"; last SELECT; }
         # M = Triplets and higher multiplets
-        if ($_[0] eq '+' ){ return "M"; last SELECT; }
+#        if ($_[0] eq '+' ){ return "M"; last SELECT; }
         # T = Tertiary interactions
         if ($_[0] eq '!' ){ return "T"; last SELECT; }
         else { return $_[0] }
@@ -570,11 +580,36 @@ __END__
    rnaml2off.pl -m
  This perl script relies on the Log::Log4perl, Path::Class and XML::Simple modules. Please make sure the according packages are around on your system.
 
-=head1 ARGUMENTS
+=head1 OPTIONS
+
+=over 8
+
+=item B<-h, --help>
+
+Display help message
+
+=item B< -m, --man>
+
+Display man page
+
+=item B<--dumper>
+
+Switch for debugging purpose. If set all found base pair informations are logged.
+
+=item B<-f, --file>
+
+RNAML file that is transformed into OFF file. This flag can be given multiple times.
+
+=item B<-d, --directory>
+
+Directory recursively searched for RNAML files ending on rna1.xml. 
+
+=item B<-n, --notation>
 
 
 
+=item B<-v, --verbose>
 
+Increases the verbosity level. Can be used multiple times (highest level if used 3 or more times) 
 
 =cut
-

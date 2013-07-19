@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 #===============================================================================
 #
-#         FILE: rdat2fasta.pl
+#         FILE: rdat2csv.pl
 #
-#        USAGE: ./rdat2fasta.pl  
+#        USAGE: ./rdat2csv.pl  
 #
 #  DESCRIPTION: 
 #
@@ -34,15 +34,19 @@ push(@INC, $module_dir);
 
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");
-my @files = ();
-my @directories = ();
+#my @files = ();
+#my @directories = ();
+my $rdat = "";
+my $blat = "";
 my $help = 0;
 my $man = 0;
 my $verbose = 0;
 my $to_dna = 0;
 GetOptions(
-    "file|f=s" => \@files,
-    "directory|d=s" => \@directories,
+#    "file|f=s" => \@files,
+#    "directory|d=s" => \@directories,
+    "rdat=s" => \$rdat,
+    "blat=s" => \$blat,
     "toDNA|t" => \$to_dna,
     "help|h" => \$help,
     "man|m" => \$man,
@@ -51,7 +55,8 @@ GetOptions(
 pod2usage(-verbose => 1) && exit if ( $help );
 pod2usage(-verbose => 2) && exit if ( $man );
 pod2usage({-verbose => 1, -message => "Use this script like this:\n"}) &&
-    exit if ( $help || scalar(@files) == 0 && scalar(@directories) == 0 );
+    exit if ( $help || $rdat eq "" || $blat eq "" );
+
 ###############################################################################
 #                 
 # Logger initiation  
@@ -76,80 +81,82 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 ###############################################################################
 
 require RNAprobing::RDATFile;
-
+require RNAprobing::BLASTresult;
 
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnamlFiles
 ##  - find all rna1.xml files in the @directories given and add them to @files
-if ( scalar(@directories ) != 0 ){
-    my @checked_directories = ();
-    foreach (@directories) {
-	if ( -d $_ ) {
-	    $logger->info("$_ is a directory");
-	    push( @checked_directories, $_ );
-	} else {
-	    $logger->info("$_ isn't a directory");
-	}
-    }
-    $logger->error("No valid directory given.") && exit 0 
-	if ( scalar(@checked_directories) == 0 && scalar(@files) == 0 );
-    $logger->info("Looking for rdat files in directories:\n".
-		  join("\n", @checked_directories));
-   find(\&wanted, @checked_directories);
-}
+#if ( scalar(@directories ) != 0 ){
+#    my @checked_directories = ();
+#    foreach (@directories) {
+#	if ( -d $_ ) {
+#	    $logger->info("$_ is a directory");
+#	    push( @checked_directories, $_ );
+#	} else {
+#	    $logger->info("$_ isn't a directory");
+#	}
+#    }
+#    $logger->error("No valid directory given.") && exit 0 
+#	if ( scalar(@checked_directories) == 0 && scalar(@files) == 0 );
+#    $logger->info("Looking for rdat files in directories:\n".
+#		  join("\n", @checked_directories));
+#   find(\&wanted, @checked_directories);
+#}
 
 ##  - check found files and add them to @rdat_files if they passed the checks
-my $rdat_files = &checkFiles(\@files);
+my $rdat_files = &checkFiles([$rdat]);
+my $blat_files = &checkFiles([$blat]);
 
-my %replace = (U => "T", u => "t");
-my $regex = join( "|", keys %replace);
-$regex = qr/$regex/;
+for (my $i = 0; $i < @{$rdat_files}; $i++ ){
+#foreach my $rdat_file ( @{ $rdat_files } ) {
+    my $rdat_file = $rdat_files->[$i];
+    my $blat_file = $blat_files->[$i];
 
-foreach my $rdat_file ( @{ $rdat_files } ) {
+
+    # generate output file name
     my($filename, $directories, $suffix) = fileparse($rdat_file);
-    my $fasta_file = $directories.$filename;
-    $fasta_file =~ s/\.rdat$//g;
-    my $fasta_file_short = $fasta_file.".short";
-    my $rdat_object = ();
-    $rdat_object = RNAprobing::RDATFile->new($rdat_file);
-    $rdat_object->write_file($rdat_file.".test");
-    # I want to sequences as output
-    # 1. $sequence: the complete one for the BLAT mapping
-    # 2. $short_seq: the short one only giving the subsequence for
-    #    which probing data is available
-    my $sequence = $rdat_object->sequence();
-    my $short_sequence = "";
-    my $seqpos = $rdat_object->seqpos();
-
-    foreach my $pos (@{$seqpos}) {
-	if (defined $rdat_object->offset_sequence_map()->{$pos}) {
-	    $short_sequence .= $rdat_object->offset_sequence_map()->{$pos};
-	}
+    my $csv_file = $directories.$filename;
+    $csv_file =~ s/\.rdat$/.csv/g;
+    # read in BLAST results
+    my $blast_object = RNAprobing::BLASTresult->new($blat_file);
+    my $query_start = $blast_object->query_start()->[0] - 1;
+    my $query_end = $blast_object->query_end()->[0] - 1;
+    # read in RDAT file and process information
+    my $rdat_object = RNAprobing::RDATFile->new($rdat_file);
+    my @sequence = split(//, $rdat_object->sequence());
+    my $startpos = $rdat_object->seq_startpos() + $query_start;
+    $logger->debug("Startpos: ".$startpos." nt: ".$rdat_object->offset_sequence_map()->{$startpos});
+    my $endpos = $startpos + $query_end;
+    $logger->debug("Endpos: ".$endpos." nt: ".$rdat_object->offset_sequence_map()->{$endpos});
+    my $header = "Position\tNucleotide";
+    foreach my $index ( @{$rdat_object->data()->indices()} ) {
+	$header .= "\texpReac$index\tscaReac$index";
     }
+    $header .= "\n";
+    my $lines = "";
+    for (my $i = $startpos; $i <= $endpos; $i++ ) {
 
-    if ($to_dna) {
-        $sequence =~ s/($regex)/$replace{$1}/g;
-        $short_sequence =~ s/($regex)/$replace{$1}/g;
-        $fasta_file .= ".dna.fa";
-	$fasta_file_short .= ".dna.fa";
-    } else {
-        $fasta_file .= ".fa";
-	$fasta_file_short .= ".fa";
+    	$lines .= $i."\t".$rdat_object->offset_sequence_map()->{$i};
+	    foreach my $index ( @{$rdat_object->data()->indices()} ) {
+	        if (defined $rdat_object->seqpos_reactivity_map($index)->{$i}){
+	         	$lines .= "\t".$rdat_object->seqpos_reactivity_map($index)->{$i};
+	        } else {
+    	    	$lines .= "\t"
+	        }
+	        if ( defined $rdat_object->seqpos_scaled_reactivity_map($index)->{$i}){
+	    	$lines .= "\t"
+	    	    .$rdat_object->seqpos_scaled_reactivity_map($index)->{$i};
+	        } else {
+	    	$lines .= "\t";
+	        }
+	    }
+	    $lines .= "\n";
     }
-
-    my $fasta_id = $filename;
-    $fasta_id =~ s/\_.*$//g;
-    open(my $fasta_fh, ">", $fasta_file) or die("Can't open $fasta_file.");
-    print $fasta_fh "> ".$fasta_id."\n";
-    print $fasta_fh $sequence."\n";
-    close($fasta_fh);
-
-    open(my $fasta_short_fh, ">", $fasta_file_short) or
-	die("Can't open $fasta_file_short.");
-    print $fasta_short_fh "> ".$fasta_id."\n";
-    print $fasta_short_fh $short_sequence."\n";
-    close($fasta_short_fh);    
+    $logger->info($lines);
+    open(my $csv_fh, ">", $csv_file) or die("Can't open $csv_file.");
+    print $csv_fh $header;
+    print $csv_fh $lines;
+    close($csv_fh);
 }
-
 my $j = 0;
 foreach my $i ( @{$rdat_files}) {
     $j++;
@@ -168,18 +175,18 @@ foreach my $i ( @{$rdat_files}) {
 ##
 ###############################################################
 
-sub wanted {
-    my $logger = get_logger("RNAprobing");
-    $logger->info("$_ is a directory") if ( -d $_ );
-    $logger->info("$_ isn't a directory") unless ( -d $_ );
-    if ( $_ =~ /\.rdat$/ ) {
-        $logger->info($File::Find::name." is a .rdat file");
-        # @files is a global variable
-        push(@files, $File::Find::name);
-    } else {
-        $logger->info("$_ is not a .rdat file");
-    }
-}
+#sub wanted {
+#    my $logger = get_logger("RNAprobing");
+#    $logger->info("$_ is a directory") if ( -d $_ );
+#    $logger->info("$_ isn't a directory") unless ( -d $_ );
+#    if ( $_ =~ /\.rdat$/ ) {
+#        $logger->info($File::Find::name." is a .rdat file");
+#        # @files is a global variable
+#        push(@files, $File::Find::name);
+#    } else {
+#        $logger->info("$_ is not a .rdat file");
+#    }
+#}
 
 ###############################################################
 ##

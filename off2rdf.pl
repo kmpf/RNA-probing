@@ -33,25 +33,33 @@ use Pod::Usage;
 use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
+use Pod::Usage;
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
-require RNAprobing::RDATFile;
-require RNAprobing::OFFFile;
-require RNAprobing::BLASTresult;
-require RNAprobing::RNAupFile;
  
 ###############################################################################
 #
 # Options section
 #
 ###############################################################################
+my $help = 0;
+my $man = 0;
 my $off_file = "";
 my $verbose = 0;
 
 GetOptions(
+    "help|h" => \$help,
+    "man|m" => \$man,
     "off=s" => \$off_file,
     "verbose|v+" => \$verbose);
+
+if ( $help ) {
+    pod2usage( -verbose => 1 ) && exit;
+} elsif ( $man ) {
+    pod2usage( -verbose => 2 ) && exit;
+} elsif ($off_file eq "") {
+    pod2usage( -verbose => 1 ) && exit;
+}
 
 ###############################################################################
 #                 
@@ -75,6 +83,11 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 #                 
 ###############################################################################
 
+require RNAprobing::RDATFile;
+require RNAprobing::OFFFile;
+require RNAprobing::BLASTresult;
+require RNAprobing::RNAupFile;
+
 $off_file = &checkFiles($off_file);
 
 # creation of OFF file object and information extraction
@@ -90,8 +103,11 @@ my @off_seq         = split(//, $off_object->sequence());
 
 &generate_rdf_model( \@off_seq, $off_object );
 
+
+
+
 ###############################################################################
-##              
+##
 ##              Subroutine section
 ##
 ###############################################################################
@@ -337,11 +353,42 @@ sub checkFiles {
 }
 
 
-# Output should be a RDAT file
-
 __END__
 
-=h1
+=head1 NAME
 
-This script requires the modules RDF::Helper, Moose, Namespace::Autoclean (???)
+off2rdf.pl - Converts a OFF file (graph) into an RDF file (graph)
+
+=head1 DESCRIPTION
+
+This script takes an OFF file and converts it into an RDF file.
+
+=head1 SYNOPSIS
+
+off2rdf.pl --off=</path/to/file.off> -vvv [-h|--help] [-m|--man] 
+
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--off=/path/to/file.off>
+
+Path to OFF file that is going to be converted into an RDF file decribing the RNA structure graph.
+
+=item B<-h, --help>
+
+Print help message
+
+=item B<-m, --man>
+
+Display man page
+
+=item B<-v, --verbose>
+
+Increases the verbosity level. Can be used multiple times (highest level if used 3 or more times) 
+
+=back
+
+=cut
 
