@@ -25,7 +25,6 @@ use feature "switch";
 use Data::Dumper;
 use File::Basename;
 use File::Spec;
-use File::HomeDir;
 use Getopt::Long;
 use Image::Magick;
 use List::Util qw(first max maxstr min minstr reduce shuffle sum);
@@ -60,6 +59,7 @@ GetOptions(
     "rdf=s" => \$rdf_file,
     "pos=s" => \$pos,
     "neg=s" => \$neg,
+    "owl=s" => \$owl_file,
     "verbose|v+" => \$verbose,
     "help|h" => \$help,
     "man|m" => \$man) or pod2usage(-verbose => 1) && exit;
@@ -121,7 +121,7 @@ while (<$pos_sparql_fh>) {
 }
 close $pos_sparql_fh;
 
-&test($rdf);
+# &test($rdf);
 # my $positive_list = &query_model( $pos_sparql_query, $rdf );
 # my $negative_list= &query_model( $neg_sparql_query, $rdf );
 my @positive_list = ();
@@ -138,6 +138,7 @@ if ( $pos_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
       foreach my $key ( @vars) {
         my $pos_element = $row->{ $key }->as_string;
         $pos_element =~ s/[<>]/"/g;
+        $logger->info($pos_element);
         push(@positive_list, $pos_element);
       }
     }
@@ -159,7 +160,7 @@ if ( $neg_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
       foreach my $key ( @vars) {
         my $neg_element = $row->{ $key }->as_string;
         $neg_element =~ s/[<>]/"/g;
-#        $logger->info($neg_element);
+        $logger->info($neg_element);
         push(@negative_list, $neg_element);
       }
     }
@@ -169,20 +170,16 @@ my $pos_query_name = fileparse( $pos );
 $pos_query_name =~ s/\.sparql$//g;
 my $conf_file = $rdf_file;
 $conf_file =~ s/\.rdf$/\.$pos_query_name\.conf/g;
-my($filename, $directories, $suffix) = fileparse($rdf_file);
-my $abs_path = File::Spec->rel2abs( $directories ) ;
-
-$rdf_file = $abs_path.$filename.$suffix;
 
 my $conf_content = "";
-$conf_content .= "// knowledge source\n".
+$conf_content .= "// knowledge sources\n".
                  "ks1.type = \"OWL File\"\n".
                  "ks1.fileName = \"$rdf_file\"\n".
-                 "ks2.type = \"OWL File\"\n".
-                 "ks2.fileName = \"$owl_file\"\n\n".
+#                 "ks2.type = \"OWL File\"\n".
+#                 "ks2.fileName = \"$owl_file\"\n\n".
                  "// reasoner\n".
                  "reasoner.type = \"fast instance checker\"\n".
-                 "reasoner.sources = { ks }\n\n".
+                 "reasoner.sources = { ks1 }\n\n".
                  "// learning problem\n".
                  "lp.type = \"posNegStandard\"\n".
                  "lp.accuracyMethod = \"fmeasure\"\n\n".
@@ -194,13 +191,13 @@ $conf_content .= "// knowledge source\n".
                  "op.useCardinalityRestrictions = true\n".
                  "op.useNegation = true\n\n".
                  "alg.type = \"celoe\"\n".
-                 "// alg.nrOfThreads = 6\n".
-                 "alg.maxExecutionTimeInSeconds = 500\n".
+                 "// alg.nrOfThreads = 4\n".
+                 "alg.maxExecutionTimeInSeconds = 60\n".
                  "alg.noisePercentage = 30\n\n".
                  "lp.positiveExamples = {".join(",", @positive_list)."}\n".
                  "lp.negativeExamples = {".join(",", @negative_list)."}\n";
 
-
+$logger->debug($conf_content);
 open(my $conf_fh, ">", $conf_file) or die "Couldn't open file $conf_file. Error: $!";
 print $conf_fh $conf_content;
 close $conf_fh;
@@ -251,7 +248,7 @@ sub query_model {
     my ($sparql_query, $model) = @_;
 #    print Dumper($model);
     my $logger = get_logger();
-    &test($model);
+#    &test($model);
     my $result_list = "";
 
     if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
@@ -278,14 +275,6 @@ sub query_model {
         }
     }
     return $result_list;
-}
-
-sub test{
-    my $model = @_;
-    my $logger = get_logger();
-#    print Dumper($model);
-    $logger->info( blessed($model) );
-    return $model;
 }
 
 __END__

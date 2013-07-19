@@ -35,7 +35,7 @@ use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
 my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
+# $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
 require RNAprobing::RDATFile;
 require RNAprobing::OFFFile;
@@ -48,17 +48,23 @@ require RNAprobing::RNAupFile;
 #
 ################################################################################
 my $help = 0;
+my $man = 0;
 my @rdf_files = ();
-my $out_rdf = "";
+my $rdf_out = "";
 my $verbose = 0;
 
 GetOptions(
     "help|h" => \$help,
+    "man|m" => \$man,
     "rdf=s"=> \@rdf_files,
-    "out|o=s" => \$out_rdf,
+    "out=s" => \$rdf_out,
     "verbose|v+" => \$verbose);
 
-if ( $help ){
+if ( $help ) {
+    pod2usage( -verbose => 1 ) && exit;
+} elsif ( $man ) {
+    pod2usage( -verbose => 2 ) && exit;
+} elsif ( $rdf_out eq "" || scalar(@rdf_files) <= 2 ){
     pod2usage( { -verbose => 1,
                  -message => "Use this script like this:\n"});
 }
@@ -68,9 +74,9 @@ if ( $help ){
 # Logger initiation  
 #                 
 ###############################################################################
-my $this_file = __FILE__;
-$this_file =~ s/scripts/RNAprobing/g;
-my $log4perl_conf = file(dirname($this_file), "RNAprobing.log.conf");
+# my $this_file = __FILE__;
+# $this_file =~ s/scripts/RNAprobing/g;
+my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
@@ -101,12 +107,12 @@ my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
 foreach my $rdf_file (@rdf_files) {
     $parser->parse_file_into_model( $base_uri, $rdf_file, $rdf->model() );
 }
-$logger->info($out_rdf);
-open (my $out_rdf_file, ">", $out_rdf)  or die("Can't open $out_rdf.");
+$logger->info($rdf_out);
+open (my $rdf_out_file, ">", $rdf_out)  or die("Can't open $rdf_out.");
 my $string = $rdf->serialize( format => 'rdfxml');
 #$logger->info($string);
-print $out_rdf_file $string;
-close $out_rdf_file;
+print $rdf_out_file $string;
+close $rdf_out_file;
 
 ###############################################################################
 ##              
@@ -141,3 +147,45 @@ sub configureLogger{
     return $logger;
 }
 
+
+__END__
+
+=head1 NAME
+
+concatenateRDFmodels.pl - Takes multiple RDF/XML models as input and writes one new model containing them all.
+
+=head1 SYNOPSIS
+
+concatenateRDFmodels.pl --rdf F<rdat-file> --out F<out.rdf> [-v -v -v] 
+
+=head1 DESCRIPTION
+
+This script concatenates all RDF/XML models given. The newly created model is then written to an user-specified file.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-h, --help>   
+
+Display help message
+
+=item B<-m, --man>
+
+Display whole man page
+
+=item B<--rdf /path/to/in.rdf>
+
+All RDF/XML models that will be concatenated are given to the script via this option. Must be given at least two times.
+
+=item B<--out /path/to/out.rdf>
+
+The file where the new RDF/XML model is written to.
+
+=item B<-v, --verbose>
+
+Increases the verbosity level. Can be used multiple times (verbosest if used 3 or more times) 
+
+=back
+
+=cut

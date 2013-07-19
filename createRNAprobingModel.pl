@@ -53,8 +53,6 @@ my $help = 0;
 my $man = 0;
 my $off_file = "";
 my $rdat_file = "";
-my $rnaup_file = "";
-my $rdf_out = 0;
 my $owl_file =file(dirname(__FILE__), "RNAprobing.owl");
 my $verbose = 0;
 
@@ -65,7 +63,6 @@ GetOptions(
     "csv" => \$csv, # optional
     "off=s" => \$off_file, # mandatory
     "rdat=s" => \$rdat_file, # mandatory
-    "rnaup=s" => \$rnaup_file, # optional
     "rdf" => \$rdf_out, # optional
     "owl=s"=> \$owl_file, 
     "verbose|v+" => \$verbose, # optional
@@ -266,24 +263,9 @@ for (my $i = 0; $i <= ($seq_endpos - $seq_startpos);  $i++ ) {
 #                 
 ###############################################################################
 
-
-#if ( $csv ){
-#    $logger->info("CSV file containing RNAup and reactivity is going to be created.");
-#    my $csv_filename = fileparse($off_object->filename());
-#    $csv_filename =~ s/off$/csv/g;
-#    &create_csv_file( $csv_filename, \%querypos_rnaup_energies, \%querypos_rnaup_prob,
-#        $querypos_reactivity, $querypos_reactivity_prob, $query_start_rdat, $query_end_rdat,
-#        \@match_in_off, \@match_in_rdat );
-#}
-
-
-if ( $rdf_out ){
-    $logger->info("RDF/XML model is going to be created.");
-    &generate_rdf_model(\%pos_seq, \%pos_reac, $subject_start_off,
-            $subject_end_off, $off_object, $rdat_object, $owl_file); 
-}
-
-
+$logger->info("RDF/XML model is going to be created.");
+&generate_rdf_model(\%pos_seq, \%pos_reac, $subject_start_off,
+        $subject_end_off, $off_object, $rdat_object, $owl_file); 
 
 ###############################################################################
 ##              
@@ -442,7 +424,7 @@ sub generate_rdf_model {
         my $parser = RDF::Trine::Parser->new( 'rdfxml' );
         my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
         my $model = $rdf->model();
-#        $parser->parse_file_into_model( $base_uri, $owl_file->stringify, $model );
+        $parser->parse_file_into_model( $base_uri, $owl_file->stringify, $model );
         # populate the RDF graph
 
         foreach my $querypos ( keys(%{$pos_seq}) ) {
@@ -486,15 +468,9 @@ sub generate_rdf_model {
 
             # ... and gets ALL its edges.
             # insert Watson-Crick, Hoogsteen or Sugar edges
-            &insert_edge( $rdf, $nuc_uri, 'W' );
-            &insert_edge( $rdf, $nuc_uri, 'H' );
-            &insert_edge( $rdf, $nuc_uri, 'S' );
-
-            # RNAupProbability for nucleotide at $querypos
-
-#            my $rna_up = $rdf->new_literal($querypos_rnaup_prob->{$querypos},
-#                       '', 'xsd:decimal');
-#            $rdf->assert_literal($nuc_uri, $has_rnaup_unpaired_prob_uri, $rna_up);
+#            &insert_edge( $rdf, $nuc_uri, 'W' );
+#            &insert_edge( $rdf, $nuc_uri, 'H' );
+#            &insert_edge( $rdf, $nuc_uri, 'S' );
 
             # ExperimentalUnpairedProbability for nucleotide at $querypos
 
@@ -505,11 +481,10 @@ sub generate_rdf_model {
                  , $react_prob);
         }
         
-    # insert all Leontis-Westhof base pairs and tertiary interactions
+        # insert all Leontis-Westhof base pairs and tertiary interactions
 
         for ( my $j = 0; $j < scalar( @{ $off_object->edges() } ); $j++) {
-
-            my @edge = @{$off_object->edges()->[$i]};
+            my @edge = @{$off_object->edges()->[$j]};
             next if ($edge[1] < $seq_start || $seq_end < $edge[2] );
 
             if ( $edge[0] ne "LW" ) {
@@ -525,6 +500,8 @@ sub generate_rdf_model {
                 my $orientation = $1;
                 my $five_prime_edge = $2;
                 my $three_prime_edge = $3;
+                &insert_edge( $rdf, $five_prime_nuc_uri, $five_prime_edge );
+                &insert_edge( $rdf, $three_prime_nuc_uri, $three_prime_edge);
 
                 # insert TertiaryInteraction
                 if ( $orientation eq '!' && $five_prime_edge eq 'T' 
@@ -539,20 +516,24 @@ sub generate_rdf_model {
                     } elsif ($orientation eq "t" ){
                         $glycosidic_bond_orientation = 'bioinf:Trans';
                     }
-                    next unless ( $five_prime_edge =~ /WEHS/ && 
-                        $three_prime_edge =~ /WEHS/ );
-                    $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge,
-                      $is_paired_with_uri,
-                      $three_prime_nuc_uri.$three_prime_edge);
-                    $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge,
-                      $is_paired_with_uri,
-                      $five_prime_nuc_uri.$five_prime_edge );
-                    $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge,
-                      $has_glycosidic_bond_orientation_uri,
-                      $glycosidic_bond_orientation );
-                    $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge,
-                      $has_glycosidic_bond_orientation_uri,
-                      $glycosidic_bond_orientation );
+                    $logger->debug("$five_prime_edge $three_prime_edge");
+                    if ( $five_prime_edge =~ /[WEHS]/ && 
+                        $three_prime_edge =~ /[WEHS]/ ) {
+                        $logger->info("$five_prime_nuc_uri.$five_prime_edge");
+                        $logger->info("$three_prime_nuc_uri.$three_prime_edge");
+                        $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge,
+                          $is_paired_with_uri,
+                          $three_prime_nuc_uri.$three_prime_edge);
+                        $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge,
+                          $is_paired_with_uri,
+                          $five_prime_nuc_uri.$five_prime_edge );
+                        $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge,
+                          $has_glycosidic_bond_orientation_uri,
+                          $glycosidic_bond_orientation );
+                        $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge,
+                          $has_glycosidic_bond_orientation_uri,
+                          $glycosidic_bond_orientation );
+                    }
                 }
             }
             else {
@@ -610,6 +591,8 @@ sub insert_edge {
     } elsif ($edge_type eq 'S') {
         $rdf_model->assert_resource($edge_uri, 'rdf:type', $sugar_edge_uri);
         $rdf_model->assert_resource($nuc_uri, $has_edge_uri, $edge_uri);
+    } elsif ($edge_type eq 'T') {
+       
     } else {
         $logger->error("Edge type $edge_type for $nuc_uri unknown.");
         exit 0;
@@ -705,18 +688,17 @@ createRNAprobingModel.pl - combines the structure information of an OFF file wit
 
 =head1 SYNOPSIS
 
-rdat2gel.pl [options] -f,--file F<rdat-file>
+createRNAprobingModel.pl [options] --blastResults </path/to/blastResults-file> --off </path/to/off-file> --rdat </path/to/rdat-file>
 
 =head1 DESCRIPTION
 
-This script creates a RDAT file, containing the results of I<in silico> probing experiment.
-To perform a probing reaction it needs to be provided with a RNA sequence stored in a FASTA file and the reactivity rules in a special file format that looks like this:
+This script creates a RDF/XML model that is stored in an auto-generated file. The model is created from three mandatory input files, an RDAT file (probing information), an OFF file (structure information), and a file containing alignment information in BLAST format.
 
+The probing data is mapped onto the structure using the alignment information.
 
 =head1 OPTIONS
 
 =over 8
-    "rnaup=s" => \$rnaup_file, #optional
 
 =item B<-h, --help>       
 
@@ -737,10 +719,6 @@ OFF file containing the sequence and structure information of a RNA (normally ex
 =item B<--rdat>
 
 RDAT file containing the probing information for a RNA (normally downloaded from the RMDB)
-
-=item B<--rdf>
-
-Flag that if set leads to the generation of the RDF model
 
 =item B<--owl>
 
