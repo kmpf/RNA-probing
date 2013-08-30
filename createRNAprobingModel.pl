@@ -37,10 +37,6 @@ use Path::Class;
 my $module_dir = dirname(__FILE__);
 #$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
-require RNAprobing::RDATFile;
-require RNAprobing::OFFFile;
-require RNAprobing::BLASTresult;
-require RNAprobing::RNAupFile;
 
 ###############################################################################
 #
@@ -91,6 +87,13 @@ Log::Log4perl->init("$log4perl_conf");
 my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".__FILE__." has been started. ++++");
+
+# require RNAprobing classes just after logger initialization
+require RNAprobing::RDATFile;
+require RNAprobing::OFFFile;
+require RNAprobing::BLASTresult;
+require RNAprobing::RNAupFile;
+
 
 ################################################################################
 #                 

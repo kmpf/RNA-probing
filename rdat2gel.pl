@@ -40,81 +40,80 @@ use Math::BigFloat;
 use Pod::Usage;
 use Path::Class;
 my $module_dir = dirname(__FILE__);
-push(@INC, $module_dir); 
-require RNAprobing::RDATFile;
+push(@INC, $module_dir);
 
 ## Definition of constants describing properties of the gel
 
 # Types of gel chamber defines size of the gel
-my %AGAROSE_GEL_CHAMBER = (
-    type => "Agarose",
-    width => 1000,      # width of gel
-    height => 1000,     # height of gel
-    top_space => 100    # free space at the top of the gel
-);
-
-my %PAA_GEL_CHAMBER = (
-    type => "PAA",
-    width => 1000,
-    height => 1000,
-    top_space => 50
-);
-
-my %PAA_PROBING_GEL_CHAMBER = (
-    type => "PAA",
-    width => 1800,
-    height => 6050,
-    top_space => 50
-);
+my %CHAMBERS = (
+    small => {
+	width => 1000,      # width of gel
+	height => 1000,     # height of gel
+	top_space => 100    # free space at the top of the gel
+    },
+    large => {
+	width => 1800,
+	height => 6050,
+	top_space => 50
+    }
+    );
 
 # Type of comb defines lane number and size
-my %TEN_WELL_COMB = (
-    nr_wells => 10,
-    lane_width => 70,
-    inter_lane_space => 26
-);
-
+my %COMBS = (
+    tenWell => {
+	nr_wells => 10,
+	lane_width => 70,
+	inter_lane_space => 26
+    }
+    );
 
 # Type of detection method describes the colors of background and bands
-my %EtBr = (
-    type => "EtBr",
-    background => "canvas:black",
-    bands => "1" # high intensity bands should be 255
-);
-
-my %RADIOGRAPHY = (
-    type => "Radiography",
-    background => "canvas:white",
-    bands => "0" #  high intensity bands should be 0 
-);
+my %DETECTION = (
+    EtBr => {
+	type => "EtBr",
+	background => "canvas:black",
+	bands => "1" # high intensity bands should be 255
+    },
+    Radiography => {
+	type => "Radiography",
+	background => "canvas:white",
+	bands => "0" #  high intensity bands should be 0 
+    }
+    );
 
 # Type of standard describes the migration properties of a DNA fragment
-my %ONE_PERCENT_AGAROSE = (
-    POWER => Math::BigFloat->new(10),   # Watt used for gel run
-    TIME => Math::BigFloat->new(60),    # duration of gel run
-    LDNA => Math::BigFloat->new(2000),  # longest separable DNA fargment in bp
-    LDIST => Math::BigFloat->new(10),   # traveled distance of LDNA fragment in pixels
-    SDNA => Math::BigFloat->new(200),    # smallest separable DNA fragment in bp
-    SDIST => Math::BigFloat->new(900)   # traveled distance of SDNA fragment in pixels
-);
-
-my %TWO_PERCENT_AGAROSE = (
-    POWER => Math::BigFloat->new(10),   # Watt used for gel run
-    TIME => Math::BigFloat->new(60),    # duration of gel run
-    LDNA => Math::BigFloat->new(1000),  # longest separable DNA fargment in bp
-    LDIST => Math::BigFloat->new(10),   # traveled distance of LDNA fragment in pixels
-    SDNA => Math::BigFloat->new(50),    # smallest separable DNA fragment in bp
-    SDIST => Math::BigFloat->new(900)   # traveled distance of SDNA fragment in pixels
-);
-
-my %TEN_PERCENT_PAA = (
-    POWER => Math::BigFloat->new(10),   # Watt used for gel run
-    TIME => Math::BigFloat->new(60),    # duration of gel run
-    LDNA => Math::BigFloat->new(300),  # longest separable DNA fargment in bp
-    LDIST => Math::BigFloat->new(500),   # traveled distance of LDNA fragment in pixels
-    SDNA => Math::BigFloat->new(10),    # smallest separable DNA fragment in bp
-    SDIST => Math::BigFloat->new(6000)   # traveled distance of SDNA fragment in pixels
-);
+my %GEL_TYPES = (
+    onePercentAgarose => {
+	type => "Agarose",
+	percentage => Math::BigFloat->new(1),
+	POWER => Math::BigFloat->new(10),   # Watt used for gel run
+	TIME => Math::BigFloat->new(60),    # duration of gel run
+	LDNA => Math::BigFloat->new(2000),  # longest separable DNA fargment in bp
+	LDIST => Math::BigFloat->new(10),   # traveled distance of LDNA fragment in pixels
+	SDNA => Math::BigFloat->new(200),    # smallest separable DNA fragment in bp
+	SDIST => Math::BigFloat->new(900)   # traveled distance of SDNA fragment in pixels
+    },
+    twoPercentAgarose => {
+	type => "Agarose",
+	percentage => Math::BigFloat->new(2),
+	POWER => Math::BigFloat->new(10),   # Watt used for gel run
+	TIME => Math::BigFloat->new(60),    # duration of gel run
+	LDNA => Math::BigFloat->new(1000),  # longest separable DNA fargment in bp
+	LDIST => Math::BigFloat->new(10),   # traveled distance of LDNA fragment in pixels
+	SDNA => Math::BigFloat->new(50),    # smallest separable DNA fragment in bp
+	SDIST => Math::BigFloat->new(900)   # traveled distance of SDNA fragment in pixels
+    },
+    tenPercentPaa => {
+	type => "PAA",
+	percentage => Math::BigFloat->new(10),
+	POWER => Math::BigFloat->new(10),   # Watt used for gel run
+	TIME => Math::BigFloat->new(60),    # duration of gel run
+	LDNA => Math::BigFloat->new(300),  # longest separable DNA fargment in bp
+	LDIST => Math::BigFloat->new(500),   # traveled distance of LDNA fragment in pixels
+	SDNA => Math::BigFloat->new(10),    # smallest separable DNA fragment in bp
+	SDIST => Math::BigFloat->new(6000)   # traveled distance of SDNA fragment in pixels
+    }
+    );
 
 my $BAND_HEIGHT = 10;
 
@@ -122,13 +121,14 @@ my $BAND_HEIGHT = 10;
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");
 my @files = ();
-my $gel_chamber_type = "PAA_probing";
-my $gel_type = "10%";
-my $comb_type = "10";
+# set defaults
+my $gel_chamber_type = "large";
+my $gel_type = "tenPercentPaa";
+my $comb_type = "tenWell";
 my $detection_type = "Radiography";
 my $verbose = 0;
 my $output_format = "png";
-my $labelled_end = "5'";
+my $labelled_end = "five-prime";
 # Gel parameter
 my $help = 0;
 my $man = 0;
@@ -137,7 +137,10 @@ GetOptions(
     "help|h" => \$help,
     "man|m" => \$man,
     "file|f=s" => \@files,
-    "geltype|g=s" => \$gel_type,
+    "gel-type=s" => \$gel_type, # PAA || Agarose
+    "gel-size=s" => \$gel_chamber_type, # small || large
+    "comb=s" => \$comb_type, # ten-well
+    "detection=s" => \$detection_type, # EtBr || radiography
     "verbose|v+" => \$verbose,
     "output-format|o=s" => \$output_format,
     "labelled-end|l=s" => \$labelled_end);
@@ -158,19 +161,20 @@ my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 # Apply configuration to the logger
 Log::Log4perl->init("$log4perl_conf");
-
 # Get the logger
 my $logger_name = "RNAprobing";
-&configureLogger($verbose, $logger_name);
-my $logger = get_logger();
+my $logger = get_logger($logger_name);
+
+&configureLogger($verbose);
 
 $logger->info("++++ ".__FILE__." has been started. ++++");
 
-$logger->info(Dumper(@files));
-
-my $rdat_files = &checkFiles(\@files);
+# require RNAprobing classes just after logger initialization
+require RNAprobing::RDATFile;
 
 ####### Application section #######
+my $rdat_files = &checkFiles(\@files);
+
 my @rdat_objects = ();
 foreach my $rdat_file ( @{$rdat_files} ) {
     my $rdat_object = RNAprobing::RDATFile->new();
@@ -178,37 +182,37 @@ foreach my $rdat_file ( @{$rdat_files} ) {
     push (@rdat_objects, $rdat_object);
 }
 
-my ($gel, $comb, $detection, $standard);
+my ($gel, $gel_chamber, $comb, $detection);
 
-if ($gel_chamber_type eq "PAA" && $gel_type eq "10%") {
-    $gel = \%PAA_GEL_CHAMBER;
-    $standard = \%TEN_PERCENT_PAA;
-} elsif ($gel_chamber_type eq "PAA_probing" && $gel_type eq "10%") {
-    $gel = \%PAA_PROBING_GEL_CHAMBER;
-    $standard = \%TEN_PERCENT_PAA;
-} elsif ($gel_chamber_type eq "Agarose" && $gel_type eq "2%") {
-    $gel = \%AGAROSE_GEL_CHAMBER;
-    $standard = \%TWO_PERCENT_AGAROSE;
+if ( grep($_ eq $gel_type, keys(%GEL_TYPES)) == 1 ){
+    $gel = $GEL_TYPES{$gel_type};
 } else {
-    die $logger->error("Gel type and gel chamber are incompatible!");
-} 
- 
-if ($comb_type eq "10") {
-    $comb = \%TEN_WELL_COMB;
-} elsif ($comb_type ) {
-
+    die $logger->error("Unknown gel value \"". $gel_type 
+		       ."\", should be one of: ". join(", ", keys(%GEL_TYPES))."!");
 }
 
-if ($detection_type eq "EtBr") {
-    $detection = \%EtBr;
-} elsif ($detection_type eq "Radiography") {
-#    $detection = \%EtBr;
-    $detection = \%RADIOGRAPHY;
+if ( grep($_ eq $gel_chamber_type, keys(%CHAMBERS)) == 1 ) {
+    $gel_chamber = $CHAMBERS{$gel_chamber_type};
 } else {
-    die $logger->error("Detection method not provided!");
+    die $logger->error("Unknown gel size value \"". $gel_chamber_type 
+		       ."\", should be one of: ". join(", ", keys(%CHAMBERS))."!");
 }
 
-&make_gel(\@rdat_objects, $gel, $comb, $detection, $standard);
+if ( grep($_ eq $comb_type, keys(%COMBS)) == 1 ) {
+    $comb = $COMBS{$comb_type};
+} else {
+    die $logger->error("Unknown comb value \"". $comb_type
+		       ."\", should be one of: ". join(", ", keys(%COMBS))."!");
+}
+
+if ( grep($_ eq $detection_type, keys(%DETECTION)) == 1 ) {
+    $detection = $DETECTION{$detection_type};
+} else {
+    die $logger->error("Unknown detection value \"". $detection_type
+		       ."\", should be one of: ". join(", ", keys(%DETECTION))."!");
+}
+
+&make_gel(\@rdat_objects, $gel, $gel_chamber, $comb, $detection);
 
 ###############################################################
 ##              
@@ -230,9 +234,6 @@ if ($detection_type eq "EtBr") {
 sub configureLogger{
     ## Configure the logger ##
     my $verbose = shift;
-    my $logger_name = shift;
-    my $logger = get_logger($logger_name);
-    print $verbose;
     SELECT:{
 	    if ($verbose == 0){ 
 		$logger->level($WARN);
@@ -255,7 +256,6 @@ sub configureLogger{
 		last SELECT;
 	    }
     }
-    return $logger;
 }
 
 ###############################################################
@@ -273,11 +273,11 @@ sub checkFiles {
     foreach  (@{$testfiles}) {
         ## Check if files are readable
 	    if ( -r $_){
-		    push(@checkedfiles, $_);
-            $logger->info("$_ is readable.")
+		push(@checkedfiles, $_);
+		$logger->info("$_ is readable.")
 	    } else {
-            $logger->error("$_ is not readable.");
-        }
+		$logger->warn("$_ is not readable.");
+	    }
     }
     return \@checkedfiles;
 }
@@ -296,28 +296,24 @@ sub checkFiles {
 
 sub make_gel {
     # get all referemces which were used to call us
-    my ($rdat_objects, $gel, $comb, $detection, $standard) = @_;
-
+    my ($rdat_objects, $gel, $gel_chamber, $comb, $detection) = @_;
     my $logger = get_logger();
-    my $left_space = ($gel->{width} - ($comb->{nr_wells} * $comb->{lane_width} + 
+    # space from the left onto the current band
+    my $left_space = ($gel_chamber->{width} - ($comb->{nr_wells} * $comb->{lane_width} + 
         ($comb->{nr_wells} - 1) * $comb->{inter_lane_space}) ) / 2;
     $logger->info('$left_space: '.$left_space);
 
-    # $gel is the image object everything should end up in
+    # $gel_image is the image object everything should end up in
     my $gel_image = Image::Magick->new;
-    $gel_image->Set(size => "$gel->{width}x$gel->{height}" );
-#    $gel_image->Set(width => $gel->{width}, height => $gel->{height} );
+    $gel_image->Set(size => "$gel_chamber->{width}x$gel_chamber->{height}" );
     $gel_image->ReadImage($detection->{background});
 
-#    my $lane = Image::Magick->new(width => ${$comb}{lane_width});
-#    my $band = Image::Magick->new(size => ${$gel}{lane_width}."x".${$gel}{band_height});
-
-    # Draw the wells them self
+    # Draw the wells themself
     for (my $i = 0; $i < $comb->{nr_wells}; $i++) {
         my $x1 = $left_space + $i * $comb->{lane_width} + $i * $comb->{inter_lane_space};
         my $x2 = $x1 + $comb->{lane_width};
-        my $y1 = $gel->{top_space} - 20;
-        my $y2 = $gel->{top_space};
+        my $y1 = $gel_chamber->{top_space} - 20;
+        my $y2 = $gel_chamber->{top_space};
         my $colour = sprintf("%d", 255 * (1 - $detection->{bands}) );
         $gel_image->Draw(primitive => "rectangle", points => "$x1,$y1 $x2,$y2",
                            stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');
@@ -326,65 +322,67 @@ sub make_gel {
     # Draw the distinct bands
     my $well_nr = 0;
     my $imagename = "";
-    foreach my $rdat_object  (@{$rdat_objects}) {
-        # Abbruch wenn zu viele wells benutzt werden
-        next  if ( $well_nr == $comb->{nr_wells});
-	my ($filename, $directories) = fileparse($rdat_object->filename());
-        $filename =~ s/\.rdat$//g;
-	$imagename .= $filename . "-";
-        my $slope = &calculate_slope($standard);
-        $logger->info("Slope of mig_dist~log(length): $slope");
-	my $data = $rdat_object->data();
-	foreach my $index ( @{$data->indices()} ) {
-	    next if ( $well_nr == $comb->{nr_wells});
-	    my $pos_reac =  $data->seqpos_scaled_reactivity_map($index);
-	    for( my $i = 0; $i < scalar(@{$rdat_object->seqpos()}); $i++ ) {
-		my $pos = $rdat_object->seqpos()->[$i];
-		# Abbruch wenn zu viele wells benutzt werden
-#		$logger->info("Reactivity[$pos]: ".$pos_reac->{$pos} );
-#		$logger->info("# of reactivties for lane $well_nr: "
-#			      .scalar( keys(%{$pos_reac}) ));
-		my $x_start = $left_space + $well_nr * $comb->{lane_width} + 
-                    $well_nr * $comb->{inter_lane_space};
-		# Calculate fragment length of migrating fragment
-		my $frag_length;
-		if ( $labelled_end eq "5'" ) {
-		    $frag_length = $i + 1;
-		} elsif ( $labelled_end eq "3'" ){
-		    # 3' part of seq until base $i
-		    $frag_length = scalar(@{$rdat_object->seqpos()}) - $i;
-		} else {
-		    $logger->error("Value $labelled_end not allowed for ".
-				   "option \"--labelled-end\".");
-		    exit;
-		}
-		my $mig_dist = 
-		    &calculate_wanderlust($standard, $slope, $frag_length);
-		my $y = $mig_dist + $gel->{top_space};
-		next if ($y > $gel->{height});
-		# Calcualte the colour of the bands given the detection type
-		my $colour = "";
+  
+    BANDS:{
+        foreach my $rdat_object  (@{$rdat_objects}) {
+            # Escape the loop after last band has been painted
+            last BANDS  if ( $well_nr >= $comb->{nr_wells});
+            my ($filename, $directories) = fileparse($rdat_object->filename());
+            $filename =~ s/\.rdat$//g;
+            $imagename .= "new_alg." . $filename . "-";
+            my $slope = &calculate_slope($gel);
+            $logger->info("Slope of mig_dist~log(length): $slope");
+            my $data = $rdat_object->data();
+            $logger->info("Band: $well_nr");
+            foreach my $index ( @{$data->indices()} ) {
+                my $pos_reac =  $data->seqpos_scaled_reactivity_map($index);
+                $logger->info(Dumper($pos_reac));
+                my $rna_length = scalar(@{$rdat_object->seqpos()});
+                for( my $i = 0; $i < $rna_length; $i++ ) {
+                    my $pos = $rdat_object->seqpos()->[$i];
+                    $logger->info($pos);
+                    my $x_start = $left_space + $well_nr * $comb->{lane_width} + 
+                        $well_nr * $comb->{inter_lane_space};
+                    # Calculate fragment length of migrating fragment
+                    my $frag_length;
+                    if ( $labelled_end eq "five-prime" ) {
+                        $frag_length = $i + 1;
+                    } elsif ( $labelled_end eq "three-prime" ){
+                        # 3' part of seq until base $i
+                        $frag_length = $rna_length - $i;
+                    } else {
+                        $logger->error("Value $labelled_end not allowed for ".
+                                       "option \"--labelled-end\". Should be ".
+                                       "'five-prime' or 'three-prime'.");
+                        exit(1);
+                    }
+                    my $mig_dist = 
+                        &calculate_fragment_migration($gel, $gel_chamber, $frag_length);
+                    $logger->info($mig_dist);
+                    my $y = $mig_dist + $gel_chamber->{top_space};
+                    next if ($y > $gel_chamber->{height});
 
-		if ($detection->{type} eq "EtBr") {
-		    $colour = sprintf("%d", 255 * $pos_reac->{$pos} );
-		} elsif ($detection->{type} eq "Radiography") {
-		    $colour = sprintf("%d", 255 * (1 - $pos_reac->{$pos}) );
-		}
-		$logger->info("Nuc: $pos / Colour: $colour");
-		my $x_end = $x_start + $comb->{lane_width};
-#		$logger->info("Band Position[$frag_length]: ".
-#			      "$x_start,$y $x_end,$y");
-		$gel_image->Draw(primitive => "line",
-				 points => "$x_start,$y $x_end,$y",
-				 stroke => "rgb($colour, $colour, $colour)",
-				 strokewidth => '5');
-	    }
-	    $well_nr++;
-#	    $logger->info("# of indices: ".scalar(@{$data->indices()}) );
+                    # Calcualte the colour of the bands given the detection type
+                    my $colour = "";                    
+                    if ($detection->{type} eq "EtBr") {
+                        $colour = sprintf("%d", 255 * $pos_reac->{$pos} );
+		    } elsif ($detection->{type} eq "Radiography") {
+                        $colour = sprintf("%d", 255 * (1 - $pos_reac->{$pos}) );
+                    }
+
+                    $logger->info("Nuc: $pos / Colour: $colour");
+                    my $x_end = $x_start + $comb->{lane_width};
+                    $logger->info("Band Position[$frag_length]: ".
+                              "$x_start,$y $x_end,$y");
+                    $gel_image->Draw(primitive => "line",
+                                     points => "$x_start,$y $x_end,$y",
+                                     stroke => "rgb($colour, $colour, $colour)",
+                                     strokewidth => '5');
+                }
+                $well_nr++;
+            }
         }
     }
-#    $logger->info('$left_space: '.$left_space);
-#    $logger->info("# of RDAT objects: ".scalar(@{$rdat_objects}));
 
     $gel_image->Blur(sigma =>'5', radius => '5');
     $imagename =~ s/-$//g;
@@ -418,16 +416,34 @@ sub make_gel {
 ###############################################################
 
 
-sub calculate_wanderlust{
-    my ($standard, $slope, $frag_length) = @_;
-    my $fl = Math::BigFloat->new($frag_length);
-    my $y = $fl->blog();
-    my $y1 = $standard->{LDNA}->copy()->blog();
-    my $x1 = $standard->{LDIST};
-    my $x = (($y - $y1) + ($slope * $x1)) / $slope;
-    $x->precision(0);
-#    $logger->info("Fragment der Laenge $frag_length wandert $x pixel");
-    return $x;
+sub calculate_fragment_migration{
+    my ($gel, $chamber,  $frag_length) = @_;
+    my $logger = get_logger();
+    my $b_frag_length = Math::BigFloat->new($frag_length);
+    $b_frag_length->badd("10");
+    $b_frag_length->bmul("0.01");
+    $logger->info("Adjusted frag_length: ". $b_frag_length);
+    my $b_gel_conc = Math::BigFloat->bnan();
+    if ($gel->{type} eq "Agarose") {
+	$b_gel_conc = $gel->{percentage}->copy()->bdiv(20);
+    } elsif ($gel->{type} eq "PAA") {
+	$b_gel_conc = $gel->{percentage}->copy()->bdiv(4);
+    } else {
+	$logger->error("Gel type unknown");
+	exit(1);
+    }
+    $logger->info("Gel concentration: " . $b_gel_conc);
+    my $lambda = Math::BigFloat->bone('-')->bmul($b_gel_conc->bmul($b_frag_length))->copy();
+    $logger->info("Lambda: ".$lambda);
+    my $lane_length = $gel_chamber->{height} - (2 * $gel_chamber->{top_space});
+    my $max_migration = Math::BigFloat->new($lane_length);
+    $logger->info("Max migration: ". $max_migration);
+    my $migration = $lambda->bexp();
+    $migration->bmul($max_migration);
+    $logger->info("Migration: ".$migration);
+    $migration->precision(0);
+#    $logger->info("Fragment der Laenge $frag_length wandert $migration pixel");
+    return $migration;
 }
 
 sub calculate_slope{
