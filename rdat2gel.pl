@@ -322,7 +322,9 @@ sub make_gel {
     # Draw the distinct bands
     my $well_nr = 0;
     my $imagename = "";
-  
+
+    my $longest_rna_on_gel = &find_longest_rna_on_gel($rdat_objects);
+
     BANDS:{
         foreach my $rdat_object  (@{$rdat_objects}) {
             # Escape the loop after last band has been painted
@@ -330,8 +332,8 @@ sub make_gel {
             my ($filename, $directories) = fileparse($rdat_object->filename());
             $filename =~ s/\.rdat$//g;
             $imagename .= "new_alg." . $filename . "-";
-            my $slope = &calculate_slope($gel);
-            $logger->info("Slope of mig_dist~log(length): $slope");
+#            my $slope = &calculate_slope($gel);
+#            $logger->info("Slope of mig_dist~log(length): $slope");
             my $data = $rdat_object->data();
             $logger->info("Band: $well_nr");
             foreach my $index ( @{$data->indices()} ) {
@@ -344,21 +346,10 @@ sub make_gel {
                     my $x_start = $left_space + $well_nr * $comb->{lane_width} + 
                         $well_nr * $comb->{inter_lane_space};
                     # Calculate fragment length of migrating fragment
-                    my $frag_length;
-                    if ( $labelled_end eq "five-prime" ) {
-                        $frag_length = $i + 1;
-                    } elsif ( $labelled_end eq "three-prime" ){
-                        # 3' part of seq until base $i
-                        $frag_length = $rna_length - $i;
-                    } else {
-                        $logger->error("Value $labelled_end not allowed for ".
-                                       "option \"--labelled-end\". Should be ".
-                                       "'five-prime' or 'three-prime'.");
-                        exit(1);
-                    }
+	        	    my $frag_length = 
+            			&calculate_fragment_length_by_label($i, $rna_length, $labelled_end);
                     my $mig_dist = 
-                        &calculate_fragment_migration($gel, $gel_chamber, $frag_length);
-                    $logger->info($mig_dist);
+                        &calculate_fragment_migration($gel, $gel_chamber, $frag_length, $longest_rna_on_gel);
                     my $y = $mig_dist + $gel_chamber->{top_space};
                     next if ($y > $gel_chamber->{height});
 
@@ -417,44 +408,118 @@ sub make_gel {
 
 
 sub calculate_fragment_migration{
-    my ($gel, $chamber,  $frag_length) = @_;
+    my ($gel, $chamber, $frag_length, $longest_rna) = @_;
     my $logger = get_logger();
-    my $b_frag_length = Math::BigFloat->new($frag_length);
-    $b_frag_length->badd("10");
-    $b_frag_length->bmul("0.01");
+    # adjust your RNA lengths
+    my ($b_frag_length, $b_longest_rna, $b_shortest_rna) = undef;
+    $b_frag_length = &adjuste_frag_length($frag_length) if (not defined $b_frag_length);
+    $b_longest_rna = &adjuste_frag_length($longest_rna) if (not defined $b_longest_rna);
+    $b_shortest_rna = &adjuste_frag_length(1) if (not defined $b_shortest_rna);
     $logger->info("Adjusted frag_length: ". $b_frag_length);
+    $logger->info("Adjusted longest_rna: ". $b_longest_rna);
+    $logger->info("Adjusted shortest_rna: ". $b_shortest_rna);
+    # determine and scale gel concentration
     my $b_gel_conc = Math::BigFloat->bnan();
     if ($gel->{type} eq "Agarose") {
-	$b_gel_conc = $gel->{percentage}->copy()->bdiv(20);
+        $b_gel_conc = $gel->{percentage}->copy()->bdiv(20);
     } elsif ($gel->{type} eq "PAA") {
-	$b_gel_conc = $gel->{percentage}->copy()->bdiv(4);
+        $b_gel_conc = $gel->{percentage}->copy()->bdiv(4);
     } else {
-	$logger->error("Gel type unknown");
-	exit(1);
+        $logger->error("Gel type unknown");
+        exit(1);
     }
-    $logger->info("Gel concentration: " . $b_gel_conc);
-    my $lambda = Math::BigFloat->bone('-')->bmul($b_gel_conc->bmul($b_frag_length))->copy();
-    $logger->info("Lambda: ".$lambda);
+    $logger->info("Gel concentration: " . $b_gel_conc); 
+
+    # calculate exponential function for:
+    my $b_exp_frag_length = &calculate_e_function($b_gel_conc->copy(),
+                                                  $b_frag_length->copy());
+    $logger->info("Exponential frag_length: ".$b_exp_frag_length);
+    my $b_exp_longest_rna = &calculate_e_function($b_gel_conc->copy(),
+                                                  $b_longest_rna->copy());
+    $logger->info("Exponential longest_rna: ".$b_exp_longest_rna);
+    my $b_exp_shortest_rna = &calculate_e_function($b_gel_conc->copy(),
+                                                   $b_shortest_rna->copy());
+    $logger->info("Exponential shortest_rna: ".$b_exp_shortest_rna);
+    
+    # calculate scale factor and scaled exp. function for frag_length
+    my $scale_factor = $b_exp_shortest_rna->bsub($b_exp_longest_rna)->copy();
+    my $scaled_exp_frag_length = $b_exp_frag_length->bsub($b_exp_longest_rna)->copy();
+    
+    # now we can calculate the migration (0 <= mig <= 1)
+    my $migration = $scaled_exp_frag_length->bdiv($scale_factor)->copy;
+    $logger->info($migration ."=". $scaled_exp_frag_length ."/". $scale_factor);
+#    $migration->bsub( Math::BigFloat->bone() );
+
+    $logger->info("Scaled migration: ".$migration);
+#    exit(1);
     my $lane_length = $gel_chamber->{height} - (2 * $gel_chamber->{top_space});
     my $max_migration = Math::BigFloat->new($lane_length);
     $logger->info("Max migration: ". $max_migration);
-    my $migration = $lambda->bexp();
     $migration->bmul($max_migration);
     $logger->info("Migration: ".$migration);
     $migration->precision(0);
-#    $logger->info("Fragment der Laenge $frag_length wandert $migration pixel");
     return $migration;
 }
 
-sub calculate_slope{
-    my ($standard) = @_;
-    my $y1 = $standard->{LDNA}->copy()->blog();
-    my $x1 = $standard->{LDIST};
-    my $y2 = $standard->{SDNA}->copy()->blog();
-    my $x2 = $standard->{SDIST};
-    my $slope =  ($y2 - $y1) / ( $x2 - $x1 );
-    return $slope;
+sub adjuste_frag_length {
+    my ($frag_length) = @_;
+    my $b_frag_length = Math::BigFloat->new($frag_length);
+    $b_frag_length->badd("0");
+    $b_frag_length->bmul("0.01");
+    return $b_frag_length->copy();
 }
+
+sub calculate_e_function {
+    my ($b_gel_conc, $b_frag_length) = @_;
+#    ($b_gel_conc, $b_frag_length) = @_;
+    my $lambda = Math::BigFloat->bone('-')
+        ->bmul($b_gel_conc->bmul($b_frag_length))->copy();
+    my $exponential = $lambda->bexp()->copy();
+    return $exponential->copy();
+}
+
+sub calculate_fragment_length_by_label {
+    my ($pos_in_rna, $total_rna_length, $labelled_end) = @_;
+    # Calculate fragment length of migrating fragment
+    my $frag_length;
+    if ( $labelled_end eq "five-prime" ) {
+	$frag_length = $pos_in_rna + 1;
+    } elsif ( $labelled_end eq "three-prime" ){
+	# 3' part of seq until base $pos_in_rna
+	$frag_length = $total_rna_length - $pos_in_rna;
+    } else {
+	$logger->error("Value $labelled_end not allowed for ".
+		       "option \"--labelled-end\". Should be ".
+		       "'five-prime' or 'three-prime'.");
+	exit(1);
+    }
+    return $frag_length;
+}
+
+sub find_longest_rna_on_gel{
+    my ($rdat_objects) = @_;
+    my $longest_rna_on_gel = 0;
+    foreach my $rdat_object (@{$rdat_objects}) {
+	my $data = $rdat_object->data();
+	foreach my $index ( @{$data->indices()} ){
+	    my $rna_length = scalar( @{$rdat_object->seqpos()} );
+	    if ($rna_length > $longest_rna_on_gel){
+		$longest_rna_on_gel = $rna_length;
+	    }
+	}
+    }
+    return $longest_rna_on_gel;
+}
+
+#sub calculate_slope{
+#    my ($standard) = @_;
+#    my $y1 = $standard->{LDNA}->copy()->blog();
+#    my $x1 = $standard->{LDIST};
+#    my $y2 = $standard->{SDNA}->copy()->blog();
+#    my $x2 = $standard->{SDIST};
+#    my $slope =  ($y2 - $y1) / ( $x2 - $x1 );
+#    return $slope;
+#}
 
 __END__
 
