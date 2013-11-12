@@ -42,32 +42,32 @@ sub read_file {
         chomp( $line );
         if ($line_number == 1 && $line =~ /^>/) {
             $self->fasta_header( $line );
-            $logger->debug("Fasta header: ".$self->fasta_header());
+            $logger->debug("[$filename] Fasta header: ".$self->fasta_header());
             $line =~ s/>\s*(\S+).*/$1/g;
             $self->fasta_id( $line );
-            $logger->debug("Fasta ID: ".$self->fasta_id() );
+            $logger->debug("[$filename] Fasta ID: ".$self->fasta_id() );
             next;
         } elsif ( $line_number == 1 ) {
-            $logger->error("First line isn't a fasta header."
+            $logger->error("[$filename] First line isn't a fasta header."
                 ." It should start with '>'. Something is wrong.");
             exit 1;
         }
         if ($line_number == 2 && $line =~ /^[ACGUacgu]*$/) {
             $self->sequence( $line );
-            $logger->debug("Sequence: ".$self->sequence() );
+            $logger->debug("[$filename] Sequence: ".$self->sequence() );
             next;
         } elsif ( $line_number == 2 ) {
-            $logger->error("Sequence seems not to be an RNA sequence."
+            $logger->error("[$filename] Sequence seems not to be an RNA sequence."
                 ." ONLY those characters are allowed: A,C,G,U,a,c,g,u\n"
                 ."Sequence: ".$line);
             exit 1;
         }
         if ($line_number == 3 && $line =~ /^[\.\(\)\[\]\{\}<>]*$/) {
             $self->structure( $line );
-            $logger->debug("Dot-bracket string: ".$self->structure() );
+            $logger->debug("[$filename] Dot-bracket string: ".$self->structure() );
             next;
         } elsif ( $line_number == 3 ) {
-            $logger->error("Dot-bracket string contains other characters as one of those:\n"
+            $logger->error("[$filename] Dot-bracket string (third line of file ) contains other characters as one of those:\n"
                 .".()[]{}<>");
             exit 1;
         }
@@ -77,7 +77,7 @@ sub read_file {
             $self->column_sizes(\@col_size);
             next;
         } elsif ($line_number == 4) {
-            $logger->error("Line $line_number should start with '# ' followed "
+            $logger->error("[$filename] Line $line_number should start with '# ' followed "
                 ."by the semicolon-separated values of the column sizes.");
         }
         if ( $line_number >= 5 && $line =~ /^#\s/ ) {
@@ -86,7 +86,7 @@ sub read_file {
 #            push(@{ $self->edges() }, [@split] );
             $nr_of_edges++;
         } elsif ( $line_number >= 5 && $line =~ /^[^#]/) {
-            $logger->error("Line $line_number should start with '# '.");
+            $logger->error("[$filename] Line $line_number should start with '# '.");
         }
         
     }

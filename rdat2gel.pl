@@ -295,7 +295,7 @@ sub checkFiles {
 
 
 sub make_gel {
-    # get all referemces which were used to call us
+    # get all references which were used to call us
     my ($rdat_objects, $gel, $gel_chamber, $comb, $detection) = @_;
     my $logger = get_logger();
     # space from the left onto the current band
@@ -316,7 +316,7 @@ sub make_gel {
         my $y2 = $gel_chamber->{top_space};
         my $colour = sprintf("%d", 255 * (1 - $detection->{bands}) );
         $gel_image->Draw(primitive => "rectangle", points => "$x1,$y1 $x2,$y2",
-                           stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');
+                         stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');
     }
 
     # Draw the distinct bands
@@ -357,7 +357,7 @@ sub make_gel {
                     my $colour = "";                    
                     if ($detection->{type} eq "EtBr") {
                         $colour = sprintf("%d", 255 * $pos_reac->{$pos} );
-		    } elsif ($detection->{type} eq "Radiography") {
+                    } elsif ($detection->{type} eq "Radiography") {
                         $colour = sprintf("%d", 255 * (1 - $pos_reac->{$pos}) );
                     }
 
@@ -397,14 +397,14 @@ sub make_gel {
 #    $out->Write('png:out.png');
 }
 
-###############################################################
+#########################################################################################
 ##
-## &calculate_wanderlust($tandard, $frag_length);
+## &calculate_fragment_migration($gel, $chamber, $frag_length, $logest_rna);
 ## - Performs file checks and returns an array with all succesfully checked files
 ## - $standard = Hash reference
 ## - $frag_length = length of fragment for which migration distance is to be calculated
 ##
-###############################################################
+#########################################################################################
 
 
 sub calculate_fragment_migration{
@@ -412,9 +412,9 @@ sub calculate_fragment_migration{
     my $logger = get_logger();
     # adjust your RNA lengths
     my ($b_frag_length, $b_longest_rna, $b_shortest_rna) = undef;
-    $b_frag_length = &adjuste_frag_length($frag_length) if (not defined $b_frag_length);
-    $b_longest_rna = &adjuste_frag_length($longest_rna) if (not defined $b_longest_rna);
-    $b_shortest_rna = &adjuste_frag_length(1) if (not defined $b_shortest_rna);
+    $b_frag_length = &adjuste_frag_length($frag_length);
+    $b_longest_rna = &adjuste_frag_length($longest_rna);
+    $b_shortest_rna = &adjuste_frag_length(1);
     $logger->info("Adjusted frag_length: ". $b_frag_length);
     $logger->info("Adjusted longest_rna: ". $b_longest_rna);
     $logger->info("Adjusted shortest_rna: ". $b_shortest_rna);
@@ -423,7 +423,7 @@ sub calculate_fragment_migration{
     if ($gel->{type} eq "Agarose") {
         $b_gel_conc = $gel->{percentage}->copy()->bdiv(20);
     } elsif ($gel->{type} eq "PAA") {
-        $b_gel_conc = $gel->{percentage}->copy()->bdiv(4);
+        $b_gel_conc = $gel->{percentage}->copy()->bdiv(20);
     } else {
         $logger->error("Gel type unknown");
         exit(1);
@@ -471,7 +471,6 @@ sub adjuste_frag_length {
 
 sub calculate_e_function {
     my ($b_gel_conc, $b_frag_length) = @_;
-#    ($b_gel_conc, $b_frag_length) = @_;
     my $lambda = Math::BigFloat->bone('-')
         ->bmul($b_gel_conc->bmul($b_frag_length))->copy();
     my $exponential = $lambda->bexp()->copy();

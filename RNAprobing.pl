@@ -52,8 +52,8 @@ my $verbose = 0;
 GetOptions(
     "help|h" => \$help,
     "man|m" => \$man,
-    "fasta=s" => \$fasta_file,
-    "chemical=s" => \$chemical_file,
+    "fasta|f=s" => \$fasta_file,
+    "chemical|c=s" => \$chemical_file,
     "verbose|v+" => \$verbose);
 
 if ( $help || !( defined $fasta_file && defined $chemical_file) ){
@@ -98,7 +98,7 @@ my $fasta = RNAprobing::OFFFile->new($fasta_file);
 $logger->debug("Loaded Fasta file ".$fasta_file);
 my $chemical = RNAprobing::Chemical->new($chemical_file);
 
-my $sample_size = 1000; # number of stochastic sampled RNA structures to probe 
+my $sample_size = 10; # number of stochastic sampled RNA structures to probe 
                       # could be an option
 my $seq = $fasta->sequence();
 $seq = uc($seq);
@@ -125,7 +125,7 @@ $logger->info("=== Results ===");
 for (my $i = 0; $i < scalar(@structures); $i++) {
     $logger->info("$i. Structure:\n$structures[$i]\n$structure_description[$i]");
 }
-$logger->info(join("", @probing_profile));
+$logger->info(join(",", @probing_profile));
 
 # === Assemble a RDAT file ===
 
@@ -343,25 +343,23 @@ sub simulate_probing {
             $prob_cut =~ /\|/;
             my $cut_pos = $-[0];
 
-
             my @seq_matches = &match_all_positions($prob_seq, $seq, $cut_pos);
             my @str_matches = &match_all_positions($prob_str, $str_desc, $cut_pos);
-
 
             if (scalar(@seq_matches) > scalar(@str_matches) ) {
                 my $more_matches = join(",",@seq_matches);
                 foreach (@str_matches) {
-                    ${probing_profile}[$_] += $prob_reac if ($more_matches =~ /,$_,/);
+                    ${probing_profile}[$_] += $prob_reac if ($more_matches =~ /^$_,|,$_,|,$_$/);
                 }
             }
             else {
                  my $more_matches = join(",",@str_matches);
                 foreach (@seq_matches) {
-                    ${probing_profile}[$_] += $prob_reac  if ($more_matches =~ /,$_,/);
+                    ${probing_profile}[$_] += $prob_reac  if ($more_matches =~ /^$_,|,$_,|,$_$/);
                 }
             }
 
-    #        print(join("",@{$probing_profile})."\n");
+    #        print(join(",",@{$probing_profile})."\n");
     #        print("$seq\n");
         }
     }
@@ -425,11 +423,11 @@ To perform a probing reaction it needs to be provided with a RNA sequence stored
 
 Display help message
 
-=item B<--fasta>
+=item B<-f, --fasta>
 
 Fasta file containing RNA sequence to be probed
 
-=item B<--chemical>
+=item B<-c, --chemical>
 
 Chemical file describing the reactivities of the probing reagent
 
