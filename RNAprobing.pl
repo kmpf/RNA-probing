@@ -98,7 +98,7 @@ my $fasta = RNAprobing::OFFFile->new($fasta_file);
 $logger->debug("Loaded Fasta file ".$fasta_file);
 my $chemical = RNAprobing::Chemical->new($chemical_file);
 
-my $sample_size = 10; # number of stochastic sampled RNA structures to probe 
+my $sample_size = 1000; # number of stochastic sampled RNA structures to probe 
                       # could be an option
 my $seq = $fasta->sequence();
 $seq = uc($seq);

@@ -64,7 +64,7 @@ sub read_file {
 
         # Construct section lines
         $self->rdat_version( $words[1] ) if ($words[0] =~ /^RDAT_VERSION$/);
-	$self->name( $words[1] ) if ($words[0] =~ /^NAME$/);
+        $self->name( $words[1] ) if ($words[0] =~ /^NAME$/);
         $self->sequence( $words[1] ) if ($words[0] =~ /^SEQUENCE$/);
         $self->structure( $words[1] ) if ($words[0] =~ /^STRUCTURE$/);
         $self->offset( $words[1] ) if ($words[0] =~ /^OFFSET$/);
@@ -507,7 +507,7 @@ sub seq_endpos {
     return $endpos;
 }
 
-# this mapping is creating a hash whose keys start at OFFSET and cover the
+# this mapping creates a hash whose keys start at OFFSET and cover the
 # whole sequence, such that the keys of this hash and those of SEQPOS are
 # mapping towards the same base
 
@@ -531,11 +531,32 @@ sub offset_sequence_map {
 	        $off_seq_map->{$i} = $sequence[$seq_index];
 	        $seq_index++;
 	    }
-            $self->{$method_key} = $off_seq_map;
+        $self->{$method_key} = $off_seq_map;
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = {};
     }
     return $self->{$method_key}; # returns a hash reference
+}
+
+
+# this mapping creates a hash whose keys are the positions of the nucleotides in
+# the RNA sequence and map these onto the values starting with OFFSET.
+sub ntpos_offset_map {
+    my ($self) = @_;
+    my $method_key = "NTPOS_OFFSET_MAP";
+    return $self->{$method_key} if ( defined $self->{$method_key} );
+    if ( defined $self->offset() && defined $self->sequence() ){
+        my $offset = $self->offset();
+        my $sequence = $self->sequence();
+        my $ntpos_offset_map = {};
+        for (my $i = 0; $i < length($sequence); $i++) {
+            $ntpos_offset_map->{$i} = $self->offset() + $i;
+        }
+        $self->{$method_key} = $ntpos_offset_map;
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = {};
+    }
+    return $self->{method_key}; # returns a hash reference
 }
 
 1;
