@@ -47,6 +47,7 @@ my $man = 0;
 my $rdat_file;
 my $fasta_file;
 my $chemical_file;
+my $samples = 1000;
 my $verbose = 0;
 
 GetOptions(
@@ -54,6 +55,7 @@ GetOptions(
     "man|m" => \$man,
     "fasta|f=s" => \$fasta_file,
     "chemical|c=s" => \$chemical_file,
+    "samples=i" => \$samples,
     "verbose|v+" => \$verbose);
 
 if ( $help || !( defined $fasta_file && defined $chemical_file) ){
@@ -97,9 +99,21 @@ require RNAprobing::OFFFile;
 my $fasta = RNAprobing::OFFFile->new($fasta_file);
 $logger->debug("Loaded Fasta file ".$fasta_file);
 my $chemical = RNAprobing::Chemical->new($chemical_file);
+my $sample_size; # number of stochastic sampled RNA structures to probe 
 
-my $sample_size = 1000; # number of stochastic sampled RNA structures to probe 
-                      # could be an option
+if (! defined $samples) {
+    $logger->error("Sample size is undefined. Please provide positive integer ".
+                   "value via '--samples' option.");
+    die;
+} elsif($samples <= 0) {
+    $logger->error("Sample size is set to ".$samples.". Please provide positive integer ".
+                   "value via '--samples' option.");
+    die;
+} else {
+    $sample_size = $samples;
+    $logger->debug("Sample size is set to ".$sample_size);
+}
+
 my $seq = $fasta->sequence();
 $seq = uc($seq);
 $logger->debug($seq);
@@ -131,7 +145,7 @@ $logger->info(join(",", @probing_profile));
 
 my $fasta_id = $fasta->fasta_id();
 $fasta_id =~ s/\.\w*$//g;
-my $rdat_file_name = $fasta_id."_".$chemical->probe_name().".rdat";
+my $rdat_file_name = $fasta_id."_".$chemical->probe_name()."_".$sample_size.".rdat";
 $rdat_file_name =~ s/\s//g;
 $logger->info("++++ ".$rdat_file_name." ++++");
 my $rdat_out = RNAprobing::RDATFile->new($rdat_file_name);
@@ -430,6 +444,10 @@ Fasta file containing RNA sequence to be probed
 =item B<-c, --chemical>
 
 Chemical file describing the reactivities of the probing reagent
+
+=item B<--samples>
+
+Sets value for Boltzmann ensemble sampling. Expects positive integer value as parameter. Default=1000
 
 =item B<-v, --verbose>
 
