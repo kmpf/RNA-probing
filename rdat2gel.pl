@@ -47,14 +47,20 @@ push(@INC, $module_dir);
 # Types of gel chamber defines size of the gel
 my %CHAMBERS = (
     small => {
-	width => 1000,      # width of gel
-	height => 1000,     # height of gel
-	top_space => 100    # free space at the top of the gel
+        height => 720,     # height of gel
+        top_space => 100,    # free space at the top of the gel
+        left_space => 200,
+        right_space => 10,
+        lane_width => 100,
+        inter_lane_space => 70
     },
     large => {
-	width => 1800,
-	height => 6050,
-	top_space => 50
+        height => 6050,
+        top_space => 50,
+        left_space => 200,
+        right_space => 10,
+        lane_width => 100,
+        inter_lane_space => 70
     }
     );
 
@@ -115,14 +121,15 @@ my %GEL_TYPES = (
     }
     );
 
-my $BAND_HEIGHT = 10;
+my $BAND_HEIGHT = 20;
 
+my @ENDS = ("five-prime", "three-prime");
 
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");
 my @files = ();
 # set defaults
-my $gel_chamber_type = "large";
+my $gel_size = "large";
 my $gel_type = "tenPercentPaa";
 my $comb_type = "tenWell";
 my $detection_type = "Radiography";
@@ -138,12 +145,12 @@ GetOptions(
     "man|m" => \$man,
     "file|f=s" => \@files,
     "gel-type=s" => \$gel_type, # PAA || Agarose
-    "gel-size=s" => \$gel_chamber_type, # small || large
+    "gel-size=s" => \$gel_size, # small || large
     "comb=s" => \$comb_type, # ten-well
     "detection=s" => \$detection_type, # EtBr || radiography
     "verbose|v+" => \$verbose,
     "output-format|o=s" => \$output_format,
-    "labelled-end|l=s" => \$labelled_end);
+    "labelled-end|l=s" => \$labelled_end );
 
 if ( $help || scalar(@files) == 0 ){
     pod2usage( { -verbose => 1,
@@ -182,7 +189,7 @@ foreach my $rdat_file ( @{$rdat_files} ) {
     push (@rdat_objects, $rdat_object);
 }
 
-my ($gel, $gel_chamber, $comb, $detection);
+my ($gel, $gel_sizes, $detection);
 
 if ( grep($_ eq $gel_type, keys(%GEL_TYPES)) == 1 ){
     $gel = $GEL_TYPES{$gel_type};
@@ -191,18 +198,11 @@ if ( grep($_ eq $gel_type, keys(%GEL_TYPES)) == 1 ){
 		       ."\", should be one of: ". join(", ", keys(%GEL_TYPES))."!");
 }
 
-if ( grep($_ eq $gel_chamber_type, keys(%CHAMBERS)) == 1 ) {
-    $gel_chamber = $CHAMBERS{$gel_chamber_type};
+if ( grep($_ eq $gel_size, keys(%CHAMBERS)) == 1 ) {
+    $gel_sizes = $CHAMBERS{$gel_size};
 } else {
-    die $logger->error("Unknown gel size value \"". $gel_chamber_type 
+    die $logger->error("Unknown gel size value \"". $gel_size 
 		       ."\", should be one of: ". join(", ", keys(%CHAMBERS))."!");
-}
-
-if ( grep($_ eq $comb_type, keys(%COMBS)) == 1 ) {
-    $comb = $COMBS{$comb_type};
-} else {
-    die $logger->error("Unknown comb value \"". $comb_type
-		       ."\", should be one of: ". join(", ", keys(%COMBS))."!");
 }
 
 if ( grep($_ eq $detection_type, keys(%DETECTION)) == 1 ) {
@@ -212,7 +212,12 @@ if ( grep($_ eq $detection_type, keys(%DETECTION)) == 1 ) {
 		       ."\", should be one of: ". join(", ", keys(%DETECTION))."!");
 }
 
-&make_gel(\@rdat_objects, $gel, $gel_chamber, $comb, $detection);
+if ( !(grep($_ eq $labelled_end, values(@ENDS)) == 1) ) {
+    die $logger->error("Unknown labelled end value \"". $labelled_end
+		       ."\", should be one of: ". join(", ", values(@ENDS))."!");
+}
+
+&make_gel(\@rdat_objects, $gel, $gel_sizes, $detection);
 
 ###############################################################
 ##              
@@ -225,37 +230,27 @@ if ( grep($_ eq $detection_type, keys(%DETECTION)) == 1 ) {
 ## &configureLogger($verbosityLevel)
 ## - Configures and initialzes the Logger
 ## - $verbosityLevel = scalar value that sets log level
-## -- 0 => $WARN
-## -- 1 => $INFO
-## -- 2 => $DEBUG
+## -- 0 => $ERROR
+## -- 1 => $WARN
+## -- 2 => $INFO
+## -- >=3 => $DEBUG
 ## 
 ###############################################################
 
 sub configureLogger{
     ## Configure the logger ##
     my $verbose = shift;
+    my $logger_name = shift;
+    my $logger = get_logger($logger_name);
+    $logger->info("Verbosity level: $verbose");
+    # print Dumper($logger);
     SELECT:{
-	    if ($verbose == 0){ 
-		$logger->level($WARN);
-		$logger->debug("Log level is WARN");
-		last SELECT; 
-	    }
-	    if ($verbose == 1){
-		$logger->level($INFO);
-		$logger->debug("Log level is INFO");
-		last SELECT;
-	    }
-	    if ($verbose == 2){
-		$logger->level($DEBUG);
-		$logger->debug("Log level is DEBUG");
-		last SELECT;
-	    }
-	    else {
-		$logger->level($ERROR);
-		$logger->debug("Log level is ERROR");
-		last SELECT;
-	    }
+	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
+	    if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
+	    else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
     }
+    return $logger;
 }
 
 ###############################################################
@@ -296,24 +291,44 @@ sub checkFiles {
 
 sub make_gel {
     # get all references which were used to call us
-    my ($rdat_objects, $gel, $gel_chamber, $comb, $detection) = @_;
+    my ($rdat_objects, $gel, $gel_sizes, $detection) = @_;
     my $logger = get_logger();
-    # space from the left onto the current band
-    my $left_space = ($gel_chamber->{width} - ($comb->{nr_wells} * $comb->{lane_width} + 
-        ($comb->{nr_wells} - 1) * $comb->{inter_lane_space}) ) / 2;
-    $logger->info('$left_space: '.$left_space);
 
-    # $gel_image is the image object everything should end up in
+    # calculate number of lanes
+    my $nr_of_lanes = 0;
+    foreach my $rdat_object (@{$rdat_objects}) {
+        my $data = $rdat_object->data();
+        $nr_of_lanes += scalar( @{$data->indices()} );
+    }
+
+    # define all necessary local variables for spaces
+    my $top_space = $gel_sizes->{top_space};
+    my $left_space = $gel_sizes->{left_space};
+    my $right_space = $gel_sizes->{right_space};
+    my $lane_width = $gel_sizes->{lane_width};
+    my $inter_lane_space = $gel_sizes->{inter_lane_space};
+    my $image_width = $left_space + ($nr_of_lanes * $lane_width) + 
+        ( ($nr_of_lanes - 1) * $inter_lane_space ) + $right_space;
+    my $image_height = $gel_sizes->{height};
+
+    $logger->info('$left_space: '.$left_space);
+    $logger->info('$right_space: '.$right_space);
+    $logger->info('$lane_width: '.$lane_width);
+    $logger->info('$inter_lane_space: '.$inter_lane_space);
+    $logger->info('$image_width: '.$image_width);
+    $logger->info('$image_height: '.$image_height);
+
+    # define $gel_image is the image object everything should end up in
     my $gel_image = Image::Magick->new;
-    $gel_image->Set(size => "$gel_chamber->{width}x$gel_chamber->{height}" );
+    $gel_image->Set(size => $image_width."x".$image_height);
     $gel_image->ReadImage($detection->{background});
 
     # Draw the wells themself
-    for (my $i = 0; $i < $comb->{nr_wells}; $i++) {
-        my $x1 = $left_space + $i * $comb->{lane_width} + $i * $comb->{inter_lane_space};
-        my $x2 = $x1 + $comb->{lane_width};
-        my $y1 = $gel_chamber->{top_space} - 20;
-        my $y2 = $gel_chamber->{top_space};
+    for (my $i = 0; $i < $nr_of_lanes; $i++) {
+        my $x1 = $left_space + $i * $lane_width + $i * $inter_lane_space;
+        my $x2 = $x1 + $lane_width;
+        my $y1 = $top_space - 40;
+        my $y2 = $top_space;
         my $colour = sprintf("%d", 255 * (1 - $detection->{bands}) );
         $gel_image->Draw(primitive => "rectangle", points => "$x1,$y1 $x2,$y2",
                          stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');
@@ -322,60 +337,75 @@ sub make_gel {
     # Draw the distinct bands
     my $well_nr = 0;
     my $imagename = "";
-
     my $longest_rna_on_gel = &find_longest_rna_on_gel($rdat_objects);
 
-    BANDS:{
-        foreach my $rdat_object  (@{$rdat_objects}) {
-            # Escape the loop after last band has been painted
-            last BANDS  if ( $well_nr >= $comb->{nr_wells});
-            my ($filename, $directories) = fileparse($rdat_object->filename());
-            $filename =~ s/\.rdat$//g;
-            $imagename .= "new_alg." . $filename . "-";
-#            my $slope = &calculate_slope($gel);
-#            $logger->info("Slope of mig_dist~log(length): $slope");
-            my $data = $rdat_object->data();
-            $logger->info("Band: $well_nr");
-            foreach my $index ( @{$data->indices()} ) {
-                my $pos_reac =  $data->seqpos_scaled_reactivity_map($index);
-                $logger->info(Dumper($pos_reac));
-                my $rna_length = scalar(@{$rdat_object->seqpos()});
-                for( my $i = 0; $i < $rna_length; $i++ ) {
-                    my $pos = $rdat_object->seqpos()->[$i];
-                    $logger->info($pos);
-                    my $x_start = $left_space + $well_nr * $comb->{lane_width} + 
-                        $well_nr * $comb->{inter_lane_space};
-                    # Calculate fragment length of migrating fragment
-	        	    my $frag_length = 
-            			&calculate_fragment_length_by_label($i, $rna_length, $labelled_end);
-                    my $mig_dist = 
-                        &calculate_fragment_migration($gel, $gel_chamber, $frag_length, $longest_rna_on_gel);
-                    my $y = $mig_dist + $gel_chamber->{top_space};
-                    next if ($y > $gel_chamber->{height});
+    foreach my $rdat_object  (@{$rdat_objects}) {
+        my ($filename, $directories) = fileparse($rdat_object->filename());
+        $filename =~ s/\.rdat$//g;
+        $imagename .= "new_alg." . $filename . "-";
+        my $data = $rdat_object->data();
+        $logger->info("Band: $well_nr");
+        foreach my $index ( @{$data->indices()} ) {
+            my $pos_reac =  $data->seqpos_scaled_reactivity_map($index);
+            $logger->info(Dumper($pos_reac));
+            my $rna_length = scalar(@{$rdat_object->seqpos()});
+            for( my $i = 0; $i < $rna_length; $i++ ) {
+                my $pos = $rdat_object->seqpos()->[$i];
+                next if ($pos <= 0);
+                $logger->info($pos);
+                my $x_start = $left_space + $well_nr * $lane_width + 
+                    $well_nr * $inter_lane_space;
+                # Calculate fragment length of migrating fragment
+                my $frag_length = 
+                    &calculate_fragment_length_by_label($i, $rna_length, $labelled_end);
+                my $mig_dist = 
+                    &calculate_fragment_migration($gel, $gel_sizes, $frag_length, $longest_rna_on_gel);
+                my $y = $mig_dist + $top_space;
+                next if ($y > $image_height);
 
-                    # Calcualte the colour of the bands given the detection type
-                    my $colour = "";                    
-                    if ($detection->{type} eq "EtBr") {
-                        $colour = sprintf("%d", 255 * $pos_reac->{$pos} );
-                    } elsif ($detection->{type} eq "Radiography") {
-                        $colour = sprintf("%d", 255 * (1 - $pos_reac->{$pos}) );
-                    }
-
-                    $logger->info("Nuc: $pos / Colour: $colour");
-                    my $x_end = $x_start + $comb->{lane_width};
-                    $logger->info("Band Position[$frag_length]: ".
-                              "$x_start,$y $x_end,$y");
-                    $gel_image->Draw(primitive => "line",
-                                     points => "$x_start,$y $x_end,$y",
-                                     stroke => "rgb($colour, $colour, $colour)",
-                                     strokewidth => '5');
+                # Calcualte the colour of the bands given the detection type
+                my $colour = "";
+                my $text_colour = "";
+                if ($detection->{type} eq "EtBr") {
+                    $colour = sprintf("%d", 255 * $pos_reac->{$pos} );
+                    $text_colour = 255;
+                } elsif ($detection->{type} eq "Radiography") {
+                    $colour = sprintf("%d", 255 * (1 - $pos_reac->{$pos}) );
+                    $text_colour = 0;
                 }
-                $well_nr++;
+
+                $logger->info("Nuc: $pos / Colour: $colour");
+                my $x_end = $x_start + $lane_width;
+                $logger->info("Band Position[$frag_length]: ".
+                              "$x_start,$y $x_end,$y");
+                $gel_image->Draw(primitive => "line",
+                                 points => "$x_start,$y $x_end,$y",
+                                 stroke => "rgb($colour, $colour, $colour)",
+                                 strokewidth => "$BAND_HEIGHT");
+                $logger->info("Nucleotide[$pos]: ".$rdat_object->offset_sequence_map()->{$pos} );
+                if ( $pos % 10 == 0 ) {
+                    my $nuc_at_pos = $rdat_object->offset_sequence_map()->{$pos};
+                    my $x_text = 10;
+                    my $y_text = $y + 25;
+                    $logger->info("Text Position: $x_text,$y_text");
+                    $gel_image->Draw(
+                        primitive => "text",
+                        points => "$x_text,$y_text",
+                        pointsize => 50,
+                        fill => "rgb($text_colour, $text_colour, $text_colour)",
+                        text => "$nuc_at_pos$pos");
+                    $gel_image->Draw(
+                        primitive => "line",
+                        points => ($x_start - 30).",$y ".($x_start - 10).",$y",
+                        stroke => "rgb($text_colour, $text_colour, $text_colour)",
+                        strokewidth => "10");
+                }
             }
         }
     }
 
-    $gel_image->Blur(sigma =>'5', radius => '5');
+
+#    $gel_image->Blur(sigma =>'5', radius => '5');
     $imagename =~ s/-$//g;
     $gel_image->Write("png:$imagename.png");
 
@@ -408,7 +438,7 @@ sub make_gel {
 
 
 sub calculate_fragment_migration{
-    my ($gel, $chamber, $frag_length, $longest_rna) = @_;
+    my ($gel, $gel_sizes, $frag_length, $longest_rna) = @_;
     my $logger = get_logger();
     # adjust your RNA lengths
     my ($b_frag_length, $b_longest_rna, $b_shortest_rna) = undef;
@@ -433,13 +463,13 @@ sub calculate_fragment_migration{
     # calculate exponential function for:
     my $b_exp_frag_length = &calculate_e_function($b_gel_conc->copy(),
                                                   $b_frag_length->copy());
-    $logger->info("Exponential frag_length: ".$b_exp_frag_length);
+#    $logger->info("Exponential frag_length: ".$b_exp_frag_length);
     my $b_exp_longest_rna = &calculate_e_function($b_gel_conc->copy(),
                                                   $b_longest_rna->copy());
-    $logger->info("Exponential longest_rna: ".$b_exp_longest_rna);
+#    $logger->info("Exponential longest_rna: ".$b_exp_longest_rna);
     my $b_exp_shortest_rna = &calculate_e_function($b_gel_conc->copy(),
                                                    $b_shortest_rna->copy());
-    $logger->info("Exponential shortest_rna: ".$b_exp_shortest_rna);
+#    $logger->info("Exponential shortest_rna: ".$b_exp_shortest_rna);
     
     # calculate scale factor and scaled exp. function for frag_length
     my $scale_factor = $b_exp_shortest_rna->bsub($b_exp_longest_rna)->copy();
@@ -447,12 +477,12 @@ sub calculate_fragment_migration{
     
     # now we can calculate the migration (0 <= mig <= 1)
     my $migration = $scaled_exp_frag_length->bdiv($scale_factor)->copy;
-    $logger->info($migration ."=". $scaled_exp_frag_length ."/". $scale_factor);
+#    $logger->info($migration ."=". $scaled_exp_frag_length ."/". $scale_factor);
 #    $migration->bsub( Math::BigFloat->bone() );
 
     $logger->info("Scaled migration: ".$migration);
 #    exit(1);
-    my $lane_length = $gel_chamber->{height} - (2 * $gel_chamber->{top_space});
+    my $lane_length = $gel_sizes->{height} - (2 * $gel_sizes->{top_space});
     my $max_migration = Math::BigFloat->new($lane_length);
     $logger->info("Max migration: ". $max_migration);
     $migration->bmul($max_migration);
