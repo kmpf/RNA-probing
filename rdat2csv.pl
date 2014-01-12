@@ -52,6 +52,7 @@ GetOptions(
     "man|m" => \$man,
     "verbose|v+" => \$verbose);
 
+print $rdat;
 pod2usage(-verbose => 1) && exit if ( $help );
 pod2usage(-verbose => 2) && exit if ( $man );
 pod2usage({-verbose => 1, -message => "Use this script like this:\n"}) &&
@@ -102,7 +103,7 @@ require RNAprobing::BLASTresult;
 #   find(\&wanted, @checked_directories);
 #}
 
-##  - check found files and add them to @rdat_files if they passed the checks
+##  - check found files and add them to $rdat_files (array reference) if they passed the checks
 my $rdat_files = &checkFiles([$rdat]);
 my $blat_files = &checkFiles([$blat]);
 
@@ -129,7 +130,7 @@ for (my $i = 0; $i < @{$rdat_files}; $i++ ){
     $logger->debug("Endpos: ".$endpos." nt: ".$rdat_object->offset_sequence_map()->{$endpos});
     my $header = "Position\tNucleotide";
     foreach my $index ( @{$rdat_object->data()->indices()} ) {
-	$header .= "\texpReac$index\tscaReac$index";
+        $header .= "\texpReac$index\tscaReac$index";
     }
     $header .= "\n";
     my $lines = "";
@@ -256,7 +257,7 @@ rdat2fasta.pl - Creating .fasta files fom .rdat files
 
 =head1 SYNOPSIS
 
-rdat2fasta.pl -f=</path/to/file> -d=</path/to/rdat-directory/> -v -t
+rdat2fasta.pl --rdat=</path/to/file> --blat=</path/to/rdat-directory/> -v -t
 
 =head1 DESCRIPTION
 
@@ -266,13 +267,13 @@ B<rdat2fasta.pl> takes RDAT files as input or searches given directories for the
 
 =over 4
 
-=item -f, --file=</path/to/file.rdat>
+=item --rdat=</path/to/file.rdat>
 
-RDAT file(s) to be converted to FASTA files. Option can be given multiple times.
+RDAT file(s) to be converted to CSV files. Option can be given multiple times.
 
-=item -d, --directory=</path/to/rdat-directory/>
+=item --blat=</path/to/file.blat>
 
-The given directories will be searched for "*.rdat" files which will be converted. Option can be given multiple times.
+File containing BLAT mapping results.
 
 =item -t, --toDNA
 
