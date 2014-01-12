@@ -51,6 +51,7 @@ my $fasta_file;
 my $chemical_file;
 my $samples = 1000;
 my $offset = 0;
+my ($seqpos_begin, $seqpos_end);
 my $verbose = 0;
 
 GetOptions(
@@ -60,6 +61,8 @@ GetOptions(
     "chemical|c=s" => \$chemical_file,
     "samples=i" => \$samples,
     "offset|o=i" => \$offset,
+    "begin|b=i" => \$seqpos_begin,
+    "end|e=i" => \$seqpos_end,
     "verbose|v+" => \$verbose);
 
 if ( $help || !( defined $fasta_file && defined $chemical_file) ){
@@ -124,6 +127,7 @@ if (! defined($samples)) {
     die;
 }
 
+
 my $seq = $fasta->sequence();
 $seq = uc($seq);
 $logger->debug($seq);
@@ -140,6 +144,28 @@ foreach (@structure_description){
 
 @probing_profile = &simulate_probing(\@structure_description, \@probing_profile, 
                                      $seq, $chemical);
+
+my ($begin, $end);
+if (defined $seqpos_begin && defined $seqpos_end &&
+    Scalar::Util::Numeric::isint($seqpos_begin) && 
+    Scalar::Util::Numeric::isint($seqpos_end) &&
+    $offset < $seqpos_begin && $seqpos_begin < $seqpos_end && 
+    $seqpos_end < length($seq)+$offset) {
+    $begin = abs($offset - $seqpos_begin);
+    $end = abs($offset - $seqpos_end);
+} else {
+    $seqpos_end = 1+$offset;
+    $seqpos_end = length($seq)+$offset;
+}
+
+print("Begin: ".$begin." end: ".$end."\n");
+
+my @reactivity;
+if (defined $begin && defined $end){
+    @reactivity = @probing_profile[$begin..$end];
+} else {
+    @reactivity = @probing_profile;
+}
 
 # === Result output ===
 # Should be logged instead of printed
@@ -167,8 +193,8 @@ $rdat_out->sequence($seq);
 my ($struct, $mfe) = RNA::fold($seq);  # predict mfe structure of $seq
 $rdat_out->structure($struct);
 $rdat_out->offset($offset);
-$rdat_out->seqpos([1+$offset..length($seq)+$offset]);
-$rdat_out->data()->reactivity(1, \@probing_profile); # 1 <- index
+$rdat_out->seqpos([$seqpos_begin..$seqpos_end]);
+$rdat_out->data()->reactivity(1, \@reactivity); # 1 <- index
 #$logger->debug(Dumper($rdat_out));
 $rdat_out->write_file();
 
