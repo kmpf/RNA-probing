@@ -34,6 +34,8 @@ use Log::Log4perl qw(get_logger :levels);
 use Path::Class;
 use Pod::Usage;
 use RNA;
+use Scalar::Util;
+use Scalar::Util::Numeric;
 my $module_dir = dirname(__FILE__);
 push(@INC, $module_dir);
 
@@ -48,6 +50,7 @@ my $rdat_file;
 my $fasta_file;
 my $chemical_file;
 my $samples = 1000;
+my $offset = 0;
 my $verbose = 0;
 
 GetOptions(
@@ -56,6 +59,7 @@ GetOptions(
     "fasta|f=s" => \$fasta_file,
     "chemical|c=s" => \$chemical_file,
     "samples=i" => \$samples,
+    "offset|o=i" => \$offset,
     "verbose|v+" => \$verbose);
 
 if ( $help || !( defined $fasta_file && defined $chemical_file) ){
@@ -101,17 +105,23 @@ $logger->debug("Loaded Fasta file ".$fasta_file);
 my $chemical = RNAprobing::Chemical->new($chemical_file);
 my $sample_size; # number of stochastic sampled RNA structures to probe 
 
-if (! defined $samples) {
+if (! defined($samples)) {
     $logger->error("Sample size is undefined. Please provide positive integer ".
                    "value via '--samples' option.");
     die;
-} elsif($samples <= 0) {
-    $logger->error("Sample size is set to ".$samples.". Please provide positive integer ".
-                   "value via '--samples' option.");
+} elsif(Scalar::Util::looks_like_number($samples) && 
+        Scalar::Util::Numeric::isint($samples) ) {
+    if($samples <= 0) {
+        $logger->error("Sample size is set to ".$samples.". Please provide ".
+                       "positive integer value via '--samples' option.");
     die;
+    } else {
+        $sample_size = $samples;
+        $logger->debug("Sample size is set to ".$sample_size);
+    }
 } else {
-    $sample_size = $samples;
-    $logger->debug("Sample size is set to ".$sample_size);
+    $logger->error("Sample size must be a positive integer.");
+    die;
 }
 
 my $seq = $fasta->sequence();
@@ -128,8 +138,7 @@ foreach (@structure_description){
     $logger->debug( "Structure description: ".$_."\n");
 }
 
-@probing_profile = &simulate_probing(\@structure_description,
-				     \@probing_profile,
+@probing_profile = &simulate_probing(\@structure_description, \@probing_profile, 
                                      $seq, $chemical);
 
 # === Result output ===
@@ -157,9 +166,8 @@ $rdat_out->sequence($seq);
 
 my ($struct, $mfe) = RNA::fold($seq);  # predict mfe structure of $seq
 $rdat_out->structure($struct);
-$rdat_out->offset(0);
-my @seqpos = (1 .. length($seq));
-$rdat_out->seqpos( \@seqpos );
+$rdat_out->offset($offset);
+$rdat_out->seqpos([1+$offset..length($seq)+$offset]);
 $rdat_out->data()->reactivity(1, \@probing_profile); # 1 <- index
 #$logger->debug(Dumper($rdat_out));
 $rdat_out->write_file();
