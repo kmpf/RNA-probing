@@ -486,7 +486,7 @@ sub seq_startpos {
     my ($self) = @_;
     my $startpos = "";
     # 1 is used because sequence is 1-indexed
-    if ( $self->offset() =~ /[+-]\d+/ ) {
+    if ( $self->offset() =~ /[+-]?\d+/ ) {
         $startpos = 1 + $self->offset();
         $logger->debug("Reactivity start position given OFFSET: $startpos");
     } else {
