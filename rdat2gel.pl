@@ -64,15 +64,6 @@ my %CHAMBERS = (
     }
     );
 
-# Type of comb defines lane number and size
-my %COMBS = (
-    tenWell => {
-	nr_wells => 10,
-	lane_width => 70,
-	inter_lane_space => 26
-    }
-    );
-
 # Type of detection method describes the colors of background and bands
 my %DETECTION = (
     EtBr => {
@@ -131,7 +122,6 @@ my @files = ();
 # set defaults
 my $gel_size = "large";
 my $gel_type = "tenPercentPaa";
-my $comb_type = "tenWell";
 my $detection_type = "Radiography";
 my $verbose = 0;
 my $output_format = "png";
@@ -144,13 +134,12 @@ GetOptions(
     "help|h" => \$help,
     "man|m" => \$man,
     "file|f=s" => \@files,
-    "gel-type=s" => \$gel_type, # PAA || Agarose
+    "gel-type=s" => \$gel_type, # onePercentAgarose || twoPercentAgarose || tenPercentPaa
     "gel-size=s" => \$gel_size, # small || large
-    "comb=s" => \$comb_type, # ten-well
-    "detection=s" => \$detection_type, # EtBr || radiography
+    "detection=s" => \$detection_type, # EtBr || Radiography
     "verbose|v+" => \$verbose,
     "output-format|o=s" => \$output_format,
-    "labelled-end|l=s" => \$labelled_end );
+    "labelled-end|l=s" => \$labelled_end ); # five-prime || three-prime
 
 if ( $help || scalar(@files) == 0 ){
     pod2usage( { -verbose => 1,
@@ -588,11 +577,28 @@ Display whole man page
 
 =item B<-f, --file>
 
-RDAT file containing RNA probing information
+RDAT file containing RNA probing information (mandatory). Can be given multiple times.
+
+=item b<--gel-type [onePercentAgarose, twoPercentAgarose, tenPercentPaa]>
+
+Indicates the type of the gel, this sets some variables concerning the migration of fragments.
+
+=item b<--gel-size [small, large]>
+
+Sets the size of the gel.
+
+=item b<--detection [EtBr, Radiography]>
+
+Can be either EtBr or Radiography. EtBr leads to bright bands on dark background. 
+Radiography leads to dark bands on bright background.
+
+=item b<--labelled-end [five-prime, three-prime]>
+
+The resulting fragment after modification/cleavage is labelled on either the 5' or 3' end.
 
 =item B<-v, --verbose>
 
-Increases the verbosity level. Can be used multiple times (verbosest if used 3 or more times) 
+Increases the verbosity level. Can be used multiple times (most verbose if used 3 or more times) 
 
 =back
 
