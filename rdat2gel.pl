@@ -48,18 +48,18 @@ push(@INC, $module_dir);
 my %CHAMBERS = (
     small => {
         height => 720,     # height of gel
-        top_space => 100,    # free space at the top of the gel
-        left_space => 200,
+        top_space => 50,    # free space at the top of the gel
+        left_space => 300,
         right_space => 10,
-        lane_width => 100,
+        lane_width => 200,
         inter_lane_space => 70
     },
     large => {
         height => 6050,
         top_space => 50,
-        left_space => 200,
+        left_space => 300,
         right_space => 10,
-        lane_width => 100,
+        lane_width => 200,
         inter_lane_space => 70
     }
     );
@@ -184,6 +184,7 @@ my $rdat_files = &checkFiles(\@files);
 
 my @rdat_objects = ();
 foreach my $rdat_file ( @{$rdat_files} ) {
+    $logger->info($rdat_file);
     my $rdat_object = RNAprobing::RDATFile->new();
     $rdat_object->read_file($rdat_file);
     push (@rdat_objects, $rdat_object);
@@ -323,31 +324,36 @@ sub make_gel {
     $gel_image->Set(size => $image_width."x".$image_height);
     $gel_image->ReadImage($detection->{background});
 
-    # Draw the wells themself
+    # Draw the wells for each band you've got
     for (my $i = 0; $i < $nr_of_lanes; $i++) {
+        # Draw the wells themself
         my $x1 = $left_space + $i * $lane_width + $i * $inter_lane_space;
         my $x2 = $x1 + $lane_width;
-        my $y1 = $top_space - 40;
+        my $y1 = 10;
         my $y2 = $top_space;
         my $colour = sprintf("%d", 255 * (1 - $detection->{bands}) );
         $gel_image->Draw(primitive => "rectangle", points => "$x1,$y1 $x2,$y2",
                          stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');
     }
 
-    # Draw the distinct bands
+    # Draw the distinct bands ...
     my $well_nr = 0;
     my $imagename = "";
     my $longest_rna_on_gel = &find_longest_rna_on_gel($rdat_objects);
-
+    
+    # ... for each RDAT file ...
     foreach my $rdat_object  (@{$rdat_objects}) {
         my ($filename, $directories) = fileparse($rdat_object->filename());
         $filename =~ s/\.rdat$//g;
-        $imagename .= "new_alg." . $filename . "-";
+        $imagename .=  $filename . "-";
         my $data = $rdat_object->data();
         $logger->info("Band: $well_nr");
+        # ... which might contain several probing tracks ...
+        # ... which end up as displayed bands
         foreach my $index ( @{$data->indices()} ) {
             my $pos_reac =  $data->seqpos_scaled_reactivity_map($index);
             $logger->info(Dumper($pos_reac));
+            # $rna_length is the number of nucleotides we have reactivities for
             my $rna_length = scalar(@{$rdat_object->seqpos()});
             for( my $i = 0; $i < $rna_length; $i++ ) {
                 my $pos = $rdat_object->seqpos()->[$i];
@@ -357,7 +363,7 @@ sub make_gel {
                     $well_nr * $inter_lane_space;
                 # Calculate fragment length of migrating fragment
                 my $frag_length = 
-                    &calculate_fragment_length_by_label($i, $rna_length, $labelled_end);
+                    &calculate_fragment_length_by_label($pos, $rna_length, $labelled_end);
                 my $mig_dist = 
                     &calculate_fragment_migration($gel, $gel_sizes, $frag_length, $longest_rna_on_gel);
                 my $y = $mig_dist + $top_space;
@@ -383,24 +389,26 @@ sub make_gel {
                                  stroke => "rgb($colour, $colour, $colour)",
                                  strokewidth => "$BAND_HEIGHT");
                 $logger->info("Nucleotide[$pos]: ".$rdat_object->offset_sequence_map()->{$pos} );
+                # Mark every 10th nucleotide on the gel
                 if ( $pos % 10 == 0 ) {
                     my $nuc_at_pos = $rdat_object->offset_sequence_map()->{$pos};
                     my $x_text = 10;
-                    my $y_text = $y + 25;
+                    my $y_text = $y - 10;
                     $logger->info("Text Position: $x_text,$y_text");
                     $gel_image->Draw(
                         primitive => "text",
                         points => "$x_text,$y_text",
-                        pointsize => 50,
+                        pointsize => 100,
                         fill => "rgb($text_colour, $text_colour, $text_colour)",
                         text => "$nuc_at_pos$pos");
                     $gel_image->Draw(
                         primitive => "line",
-                        points => ($x_start - 30).",$y ".($x_start - 10).",$y",
+                        points => ($x_text).",$y ".($x_text + ($left_space - 50) ).",$y",
                         stroke => "rgb($text_colour, $text_colour, $text_colour)",
                         strokewidth => "10");
                 }
             }
+            $well_nr++;
         }
     }
 
@@ -512,15 +520,15 @@ sub calculate_fragment_length_by_label {
     # Calculate fragment length of migrating fragment
     my $frag_length;
     if ( $labelled_end eq "five-prime" ) {
-	$frag_length = $pos_in_rna + 1;
+        $frag_length = $pos_in_rna + 1;
     } elsif ( $labelled_end eq "three-prime" ){
-	# 3' part of seq until base $pos_in_rna
-	$frag_length = $total_rna_length - $pos_in_rna;
+        # 3' part of seq until base $pos_in_rna
+        $frag_length = $total_rna_length - $pos_in_rna;
     } else {
-	$logger->error("Value $labelled_end not allowed for ".
-		       "option \"--labelled-end\". Should be ".
-		       "'five-prime' or 'three-prime'.");
-	exit(1);
+        $logger->error("Value $labelled_end not allowed for ".
+                       "option \"--labelled-end\". Should be ".
+                       "'five-prime' or 'three-prime'.");
+        exit(1);
     }
     return $frag_length;
 }
