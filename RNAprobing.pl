@@ -158,8 +158,6 @@ if (defined $seqpos_begin && defined $seqpos_end &&
     $seqpos_end = length($seq)+$offset;
 }
 
-print("Begin: ".$begin." end: ".$end."\n");
-
 my @reactivity;
 if (defined $begin && defined $end){
     @reactivity = @probing_profile[$begin..$end];
@@ -224,7 +222,6 @@ sub configureLogger{
     my $logger_name = shift;
     my $logger = get_logger($logger_name);
     $logger->info("Verbosity level: $verbose");
-    # print Dumper($logger);
     SELECT:{
 	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
 	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
@@ -308,7 +305,6 @@ foreach (@structures) {
                     $enclosed_stems++;
                 }
             }
-#           print("Enclosed unpaired nucleotides: "                    .join(",", @enclosed_dots)."\n");
 
             # Hairpin or bulge detected
             if ( $enclosed_stems == 0 ) {
@@ -317,13 +313,11 @@ foreach (@structures) {
                 if ($op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] &&
                     $cl_br_pos - 1 == $enclosed_dots[0] ) {            
                     foreach (@enclosed_dots) { $struc_dec[$_] = "H" }
-#                    print("Hairpin found.\n");
                 }
                 # bulge detected if the enclosed dots just touch one bracket
                 elsif ( $op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] ||
                         $cl_br_pos - 1 == $enclosed_dots[0] ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "B" }
-#                    print("Bulge found.\n");
                 }
             }
             # Multi loop with two included stems or an interior loop detected
@@ -333,20 +327,17 @@ foreach (@structures) {
                 if ($op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] &&
                     $cl_br_pos - 1 == $enclosed_dots[0] ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "I" }
-#                    print("Interior loop found.\n");
                 }
                 # Multi loop with two stems detected if the enclosed dots just
                 # touch one bracket
                 elsif ( $op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] ||
                         $cl_br_pos - 1 == $enclosed_dots[0] ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "M" }
-#                    print("Multi loop found.\n");
                 }
             }
             # Multi loop detected if more than one stem is enclosed
             elsif( $enclosed_stems > 1 ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "M" }
-#                    print("Multi loop found.\n");
             }
         }
         # No enclosed unpaired nucleotides so lets declare the base pair
@@ -357,7 +348,6 @@ foreach (@structures) {
         }
     }
     my $str_desc = join("",@struc_dec);
-#    print("$_\n$str_desc\n");
     push(@structure_description, join("",@struc_dec));
 }
 return @structure_description;
@@ -406,9 +396,6 @@ sub simulate_probing {
                     ${probing_profile}[$_] += $prob_reac  if ($more_matches =~ /^$_,|,$_,|,$_$/);
                 }
             }
-
-    #        print(join(",",@{$probing_profile})."\n");
-    #        print("$seq\n");
         }
     }
     return @{$probing_profile};
