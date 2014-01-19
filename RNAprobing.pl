@@ -151,8 +151,8 @@ if (defined $seqpos_begin && defined $seqpos_end &&
     Scalar::Util::Numeric::isint($seqpos_end) &&
     $offset < $seqpos_begin && $seqpos_begin < $seqpos_end && 
     $seqpos_end < length($seq)+$offset) {
-    $begin = abs($offset - $seqpos_begin);
-    $end = abs($offset - $seqpos_end);
+    $begin = abs(1 + $offset - $seqpos_begin);
+    $end = abs(1 + $offset - $seqpos_end);
 } else {
     $seqpos_end = 1+$offset;
     $seqpos_end = length($seq)+$offset;
