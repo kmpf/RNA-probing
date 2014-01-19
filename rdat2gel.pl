@@ -48,7 +48,7 @@ push(@INC, $module_dir);
 my %CHAMBERS = (
     small => {
         height => 720,     # height of gel
-        top_space => 50,    # free space at the top of the gel
+        top_space => 80,    # free space at the top of the gel
         left_space => 300,
         right_space => 10,
         lane_width => 200,
@@ -56,7 +56,7 @@ my %CHAMBERS = (
     },
     large => {
         height => 6050,
-        top_space => 50,
+        top_space => 80,
         left_space => 300,
         right_space => 10,
         lane_width => 200,
@@ -233,7 +233,6 @@ sub configureLogger{
     my $logger_name = shift;
     my $logger = get_logger($logger_name);
     $logger->info("Verbosity level: $verbose");
-    # print Dumper($logger);
     SELECT:{
 	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
 	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
@@ -319,7 +318,7 @@ sub make_gel {
         my $x1 = $left_space + $i * $lane_width + $i * $inter_lane_space;
         my $x2 = $x1 + $lane_width;
         my $y1 = 10;
-        my $y2 = $top_space;
+        my $y2 = $top_space - 20;
         my $colour = sprintf("%d", 255 * (1 - $detection->{bands}) );
         $gel_image->Draw(primitive => "rectangle", points => "$x1,$y1 $x2,$y2",
                          stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');
@@ -345,14 +344,18 @@ sub make_gel {
             # $rna_length is the number of nucleotides we have reactivities for
             my $rna_length = scalar(@{$rdat_object->seqpos()});
             for( my $i = 0; $i < $rna_length; $i++ ) {
+                # $pos is essentially a key for all the hashmaps created ...
                 my $pos = $rdat_object->seqpos()->[$i];
+                # ... but it is not the length of a fragment that is just $i
+              
                 next if ($pos <= 0);
                 $logger->info($pos);
                 my $x_start = $left_space + $well_nr * $lane_width + 
                     $well_nr * $inter_lane_space;
                 # Calculate fragment length of migrating fragment
                 my $frag_length = 
-                    &calculate_fragment_length_by_label($pos, $rna_length, $labelled_end);
+                    # $i is used for the fragment length calculation as I said
+                    &calculate_fragment_length_by_label($i, $rna_length, $labelled_end);
                 my $mig_dist = 
                     &calculate_fragment_migration($gel, $gel_sizes, $frag_length, $longest_rna_on_gel);
                 my $y = $mig_dist + $top_space;
@@ -400,28 +403,8 @@ sub make_gel {
             $well_nr++;
         }
     }
-
-
-#    $gel_image->Blur(sigma =>'5', radius => '5');
     $imagename =~ s/-$//g;
     $gel_image->Write("png:$imagename.png");
-
-#           $colour = sprintf("%d", 255 * (1 - $nuc_reactivity) );
-
-#            $perlmagick_error = $band->Read('xc:white');
-#            warn $perlmagick_error if $perlmagick_error;
-#            $perlmagick_error = $band->Draw(primitive => "line", points => "0,15 $BAND_WIDTH,15", stroke => "rgb($colour, $colour, $colour)", strokewidth => '10');
-#            $perlmagick_error = $band->Draw(primitive => "line", points => "0,15 $BAND_WIDTH,15", stroke => "rgb($colour, $colour, $colour)", strokewidth => '10');
-#            warn $perlmagick_error if $perlmagick_error;
-#            push (@{$lane}, @{$band});
-#            @{$band} = ();           
-#            $lane->Blur(sigma =>'3', radius => '3');
-#        }
-#        push ( @$gel, $lane->Append(stack=>'true') );
-#        @$lane = ();
-#    }
-#    my $out = $gel->Append(stack => 'false');
-#    $out->Write('png:out.png');
 }
 
 #########################################################################################
