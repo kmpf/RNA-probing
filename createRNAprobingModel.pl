@@ -59,7 +59,7 @@ GetOptions(
     "csv" => \$csv, # optional
     "off=s" => \$off_file, # mandatory
     "rdat=s" => \$rdat_file, # mandatory
-    "rdf" => \$rdf_out, # optional
+#    "rdf" => \$rdf_out, # optional
     "owl=s"=> \$owl_file, 
     "verbose|v+" => \$verbose, # optional
     );
@@ -92,7 +92,7 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 require RNAprobing::RDATFile;
 require RNAprobing::OFFFile;
 require RNAprobing::BLASTresult;
-require RNAprobing::RNAupFile;
+#require RNAprobing::RNAupFile;
 
 
 ################################################################################
@@ -123,7 +123,7 @@ my $off_object      = RNAprobing::OFFFile->new($off_file);
 my $blast_result_object = RNAprobing::BLASTresult->new($blast_result);
 
 # creation of RNAup file object and information extraction
-my $rnaup_object    = RNAprobing::RNAupFile->new($rnaup_file);
+#my $rnaup_object    = RNAprobing::RNAupFile->new($rnaup_file);
 
 ################################################################################
 #                 
@@ -390,14 +390,14 @@ sub generate_rdf_model {
     my $has_tertiary_interaction_with_uri = 'bioinf:hasTertiaryInteractionWith';
     my $is_three_prime_of_uri = 'bioinf:isThreePrimeOf';
     my $is_five_prime_of_uri = 'bioinf:isFivePrimeOf';
-    my $is_paired_with_uri = 'bioinf:isPairedWith';
+    my $is_paired_with_uri = 'bioinf:isPairedWith'; # Edge isPairedWith Edge
 
-    # define data properties
+    # define data properties ...
 
-    my $has_exp_unpaired_prob_uri = 'bioinf:hasExperimentalUnpairedProbability';
-    my $has_rnaup_unpaired_prob_uri = 'bioinf:hasRNAupUnpairedProbability';
-    my $has_glycosidic_bond_orientation_uri = 'bioinf:hasGlycosidicBondOrientation';
-
+    my $has_reactivity = 'bioinf:hasReactivity';
+    my $is_paired_uri = 'bioinf:isPaired'; # Ribonucleotide isPaired boolean
+    my $glycosidic_bond_in_cis_uri = 'bioinf:GlycosidicBondInCis';
+    my $glycosidic_bond_in_trans_uri = 'bioinf:GlycosidicBondInTrans';
 
     # For each elemnet in @{$rdat_object->mutpos()} create a new RDF::Helper
     # object, to get only one experimentalUnpairedProbability per nucleotide
@@ -423,13 +423,17 @@ sub generate_rdf_model {
                 '#default' => "http://purl.org/rss/1.0/",
                 },
             ExpandQNames => 1);
-        # HowTo parse a file into a model
-        my $parser = RDF::Trine::Parser->new( 'rdfxml' );
-        my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
-        my $model = $rdf->model();
-        $parser->parse_file_into_model( $base_uri, $owl_file->stringify, $model );
-        # populate the RDF graph
+        # HowTo parse a file into a model (only needed if I soak the OWL file into the model)
+#        my $parser = RDF::Trine::Parser->new( 'rdfxml' );
+#        my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
+#        my $model = $rdf->model();
+#        $parser->parse_file_into_model( $base_uri, $owl_file->stringify, $model );
 
+        # These are the definitions for the bioinf:isPaired Data Porperty
+        my $bool_true = $rdf->new_literal('true', '', 'xsd:boolean');
+        my $bool_false = $rdf->new_literal('false', '', 'xsd:boolean');
+
+        # populate the RDF graph
         foreach my $querypos ( keys(%{$pos_seq}) ) {
         # each nucleotide gets its node and ... 
             my $nuc_uri = 'bioinf:'.$rdf_id.'/'.$pos_seq{$querypos}.$querypos;
@@ -469,19 +473,21 @@ sub generate_rdf_model {
             $rdf->assert_resource($nuc_uri, 'rdf:type', $ribonucleotide_uri)
                 if ( $pos_seq{$querypos} eq 'N');
 
-            # ... and gets ALL its edges.
+        # ... and gets ALL its edges ...
             # insert Watson-Crick, Hoogsteen or Sugar edges
-#            &insert_edge( $rdf, $nuc_uri, 'W' );
-#            &insert_edge( $rdf, $nuc_uri, 'H' );
-#            &insert_edge( $rdf, $nuc_uri, 'S' );
+            &insert_edge( $rdf, $nuc_uri, 'W' );
+            &insert_edge( $rdf, $nuc_uri, 'H' );
+            &insert_edge( $rdf, $nuc_uri, 'S' );
 
-            # ExperimentalUnpairedProbability for nucleotide at $querypos
+       # ... and its reactivity ...
 
             # add 1 because $i is 0-indexed but the keys are 1-indexed
             my $reactivity = $pos_reac{$i + 1}->{$querypos};
             my $react_prob = $rdf->new_literal($reactivity, '', 'xsd:decimal');
-            $rdf->assert_literal($nuc_uri, $has_exp_unpaired_prob_uri
-                 , $react_prob);
+            $rdf->assert_literal($nuc_uri, $has_reactivity, $react_prob);
+
+        # ... and at first we assume it to be unpaired.
+            $rdf->assert_literal($nuc_uri, $is_paired_uri, $bool_true);
         }
         
         # insert all Leontis-Westhof base pairs and tertiary interactions
@@ -507,21 +513,19 @@ sub generate_rdf_model {
                 &insert_edge( $rdf, $three_prime_nuc_uri, $three_prime_edge);
 
                 # insert TertiaryInteraction
+                # if marked as tertiary interaction ...
                 if ( $orientation eq '!' && $five_prime_edge eq 'T' 
                      && $three_prime_edge eq 'T') {
+                    # ... add the info ...
                     $rdf->assert_resource($five_prime_nuc_uri
                       , $has_tertiary_interaction_with_uri
                       , $three_prime_nuc_uri );
-                } elsif ($orientation eq 'c' || $orientation eq 't' ) {
-                    my $glycosidic_bond_orientation = ();
-                    if ( $orientation eq "c" ){
-                        $glycosidic_bond_orientation = 'bioinf:Cis';
-                    } elsif ($orientation eq "t" ){
-                        $glycosidic_bond_orientation = 'bioinf:Trans';
-                    }
+                # ... otherwise its a Leontis-Westhof base pair ...
+                } elsif ($orientation eq 'c' || $orientation eq 't' ) {                 
                     $logger->debug("$five_prime_edge $three_prime_edge");
                     if ( $five_prime_edge =~ /[WEHS]/ && 
                         $three_prime_edge =~ /[WEHS]/ ) {
+                        # ... and its information is added here ...
                         $logger->info("$five_prime_nuc_uri.$five_prime_edge");
                         $logger->info("$three_prime_nuc_uri.$three_prime_edge");
                         $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge,
@@ -530,12 +534,21 @@ sub generate_rdf_model {
                         $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge,
                           $is_paired_with_uri,
                           $five_prime_nuc_uri.$five_prime_edge );
-                        $rdf->assert_resource($five_prime_nuc_uri.$five_prime_edge,
-                          $has_glycosidic_bond_orientation_uri,
-                          $glycosidic_bond_orientation );
-                        $rdf->assert_resource($three_prime_nuc_uri.$three_prime_edge,
-                          $has_glycosidic_bond_orientation_uri,
-                          $glycosidic_bond_orientation );
+                        if ( $orientation eq "c" ){
+                            $rdf->assert_literal($five_prime_nuc_uri.$five_prime_edge,
+                                                 $glycosidic_bond_in_cis_uri,
+                                                 $bool_true);
+                        } elsif ($orientation eq "t" ){
+                            $rdf->assert_literal($three_prime_nuc_uri.$three_prime_edge,
+                                                 $glycosidic_bond_in_trans_uri,
+                                                 $bool_true);
+                        }
+                        # ... also both nucleotides involved in the base pair
+                        # are not unpaired anymore, of course.
+                        $rdf->update_literal($five_prime_nuc_uri, $is_paired_uri,
+                                             $bool_true, $bool_false);
+                        $rdf->update_literal($three_prime_nuc_uri, $is_paired_uri,
+                                             $bool_true, $bool_false);
                     }
                 }
             }
