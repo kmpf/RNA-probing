@@ -50,7 +50,7 @@ require RNAprobing::RNAupFile;
 my $rdf_file = "";
 my $pos = "";
 my $neg = "";
-my $owl_file =file(dirname(__FILE__), "RNAprobing.owl");
+my $owl_file ="";
 my $verbose = 0;
 my $help = "";
 my $man = 0;
@@ -173,29 +173,31 @@ $conf_file =~ s/\.rdf$/\.$pos_query_name\.conf/g;
 
 my $conf_content = "";
 $conf_content .= "// knowledge sources\n".
-                 "ks1.type = \"OWL File\"\n".
-                 "ks1.fileName = \"$rdf_file\"\n".
-#                 "ks2.type = \"OWL File\"\n".
-#                 "ks2.fileName = \"$owl_file\"\n\n".
-                 "// reasoner\n".
-                 "reasoner.type = \"fast instance checker\"\n".
-                 "reasoner.sources = { ks1 }\n\n".
-                 "// learning problem\n".
-                 "lp.type = \"posNegStandard\"\n".
-                 "lp.accuracyMethod = \"fmeasure\"\n\n".
-                 "// learning algorithm\n".
-                 "h.type =\"celoe_heuristic\"\n".
-                 "// h.expansionPenaltyFactor = 0.2\n".
-                 "h.expansionPenaltyFactor = 0.01\n\n".
-                 "op.type = \"rho\"\n".
-                 "op.useCardinalityRestrictions = true\n".
-                 "op.useNegation = true\n\n".
-                 "alg.type = \"celoe\"\n".
-                 "// alg.nrOfThreads = 4\n".
-                 "alg.maxExecutionTimeInSeconds = 60\n".
-                 "alg.noisePercentage = 30\n\n".
-                 "lp.positiveExamples = {".join(",", @positive_list)."}\n".
-                 "lp.negativeExamples = {".join(",", @negative_list)."}\n";
+    "ks1.type = \"OWL File\"\n".
+    "ks1.fileName = \"$rdf_file\"\n";
+if ($owl_file ne ""){
+    $conf_content .= "ks2.type = \"OWL File\"\n".
+        "ks2.fileName = \"$owl_file\"\n\n";
+}
+$conf_content .= "// reasoner\n".
+    "reasoner.type = \"fast instance checker\"\n".
+    "reasoner.sources = { ks1 }\n\n".
+    "// learning problem\n".
+    "lp.type = \"posNegStandard\"\n".
+    "lp.accuracyMethod = \"fmeasure\"\n\n".
+    "// learning algorithm\n".
+    "h.type =\"celoe_heuristic\"\n".
+    "// h.expansionPenaltyFactor = 0.2\n".
+    "h.expansionPenaltyFactor = 0.01\n\n".
+    "op.type = \"rho\"\n".
+    "op.useCardinalityRestrictions = true\n".
+    "op.useNegation = true\n\n".
+    "alg.type = \"celoe\"\n".
+    "// alg.nrOfThreads = 4\n".
+    "alg.maxExecutionTimeInSeconds = 60\n".
+    "alg.noisePercentage = 30\n\n".
+    "lp.positiveExamples = {".join(",", @positive_list)."}\n".
+    "lp.negativeExamples = {".join(",", @negative_list)."}\n";
 
 $logger->debug($conf_content);
 open(my $conf_fh, ">", $conf_file) or die "Couldn't open file $conf_file. Error: $!";
