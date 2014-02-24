@@ -48,7 +48,7 @@ push(@INC, $module_dir);
 my %CHAMBERS = (
     small => {
         height => 720,     # height of gel
-        top_space => 80,    # free space at the top of the gel
+        top_space => 120,    # free space at the top of the gel
         left_space => 300,
         right_space => 10,
         lane_width => 200,
@@ -56,7 +56,7 @@ my %CHAMBERS = (
     },
     large => {
         height => 6050,
-        top_space => 80,
+        top_space => 120,
         left_space => 300,
         right_space => 10,
         lane_width => 200,
@@ -312,16 +312,27 @@ sub make_gel {
     $gel_image->Set(size => $image_width."x".$image_height);
     $gel_image->ReadImage($detection->{background});
 
-    # Draw the wells for each band you've got
+    my $text_colour = "";
+    if ($detection->{type} eq "EtBr") {
+        $text_colour = 255;
+    } elsif ($detection->{type} eq "Radiography") {
+        $text_colour = 0;
+    }
+
+    # Draw the lane numbers for each lane we've got
     for (my $i = 0; $i < $nr_of_lanes; $i++) {
-        # Draw the wells themself
-        my $x1 = $left_space + $i * $lane_width + $i * $inter_lane_space;
-        my $x2 = $x1 + $lane_width;
-        my $y1 = 10;
-        my $y2 = $top_space - 20;
-        my $colour = sprintf("%d", 255 * (1 - $detection->{bands}) );
-        $gel_image->Draw(primitive => "rectangle", points => "$x1,$y1 $x2,$y2",
-                         stroke => "rgb($colour, $colour, $colour)", strokewidth => '3');
+        # Calculate position
+        my $x1 = $left_space + $i * $lane_width + $i * $inter_lane_space +
+            int($lane_width / 2);
+        my $y1 = $top_space - 20;
+        # Draw text
+        my $lane_nr = $i + 1;
+        $gel_image->Draw(
+            primitive => "text",
+            points => "$x1,$y1",
+            pointsize => 100,
+            fill => "rgb($text_colour, $text_colour, $text_colour)",
+            text => "$lane_nr");
     }
 
     # Draw the distinct bands ...
@@ -363,13 +374,10 @@ sub make_gel {
 
                 # Calcualte the colour of the bands given the detection type
                 my $colour = "";
-                my $text_colour = "";
                 if ($detection->{type} eq "EtBr") {
                     $colour = sprintf("%d", 255 * $pos_reac->{$pos} );
-                    $text_colour = 255;
                 } elsif ($detection->{type} eq "Radiography") {
                     $colour = sprintf("%d", 255 * (1 - $pos_reac->{$pos}) );
-                    $text_colour = 0;
                 }
 
                 $logger->info("Nuc: $pos / Colour: $colour");
@@ -383,7 +391,7 @@ sub make_gel {
                 $logger->info("Nucleotide[$pos]: ".$rdat_object->offset_sequence_map()->{$pos} );
                 # Mark every 10th nucleotide on the gel
                 if ( $pos % 10 == 0 ) {
-                    my $nuc_at_pos = $rdat_object->offset_sequence_map()->{$pos};
+                    my $nuc_at_pos = uc($rdat_object->offset_sequence_map()->{$pos});
                     my $x_text = 10;
                     my $y_text = $y - 10;
                     $logger->info("Text Position: $x_text,$y_text");
