@@ -113,11 +113,12 @@ my $off_object      = RNAprobing::OFFFile->new($off_file);
 my $off_sequence = $off_object->sequence();
 my $rdat_sequence = $rdat_object->sequence();
 my $rdat_offset = $rdat_object->offset();
-my $start_position; # position where both sequences start to be equal
+my ($start_position, $end_position); # position where both sequences start to be equal
 
 
 if ($rdat_sequence =~ /$off_sequence/) {
     $start_position = $-[0];
+    $end_position = $start_position + length($off_sequence);
 } else {
     $logger->error("Can't match sequence in ".$off_object->filename().
         " to sequence in ".$rdat_object->filename());
@@ -128,9 +129,9 @@ foreach my $rdat_index ( @{$rdat_object->data()->indices()} ) {
     my $color_map_filename = $rdat_filename."_".$rdat_index.".color_map";
     $color_map_filename =~ s/\.rdat//g;
     open(my $color_map, ">", $color_map_filename) or die "Couldn't open file $color_map_filename. Error: $!";
-    for (my $i = $start_position; $i < length($rdat_sequence); $i++){
+    for (my $i = $start_position; $i <= $end_position; $i++){
         my @sequence = split("", $rdat_sequence);
-        print($color_map $rdat_object->data()->seqpos_reactivity_map($rdat_index)->{$rdat_offset+$i+1}."\n");
+        print($color_map $rdat_object->data()->seqpos_reactivity_map($rdat_index)->{1+$rdat_offset+$i}."\n");
     }
 }
 exit(0);
