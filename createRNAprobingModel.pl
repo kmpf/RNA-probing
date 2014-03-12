@@ -424,10 +424,10 @@ sub generate_rdf_model {
                 },
             ExpandQNames => 1);
         # HowTo parse a file into a model (only needed if I soak the OWL file into the model)
-#        my $parser = RDF::Trine::Parser->new( 'rdfxml' );
-#        my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
-#        my $model = $rdf->model();
-#        $parser->parse_file_into_model( $base_uri, $owl_file->stringify, $model );
+        my $parser = RDF::Trine::Parser->new( 'rdfxml' );
+        my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
+        my $model = $rdf->model();
+        $parser->parse_file_into_model( $base_uri, $owl_file, $model );
 
         # These are the definitions for the bioinf:isPaired Data Porperty
         my $bool_true = $rdf->new_literal('true', '', 'xsd:boolean');
