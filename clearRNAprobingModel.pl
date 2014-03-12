@@ -99,13 +99,6 @@ my $parser = RDF::Trine::Parser->new( 'rdfxml' );
 my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
 $parser->parse_file_into_model( $base_uri, $rdf_file, $rdf->model() );
 
-# remove all triple with the given $subject, $predicate, and/or $object
-
-my $subject = undef;
-my $predicate = 'bioinf:hasExperimentalUnpairedProbability';
-my $object = undef; 
-$rdf->remove_statements($subject, $predicate, $object);
-
 # Write the reduced model to file
 
 my $reduced_rdf = $rdf_file;
