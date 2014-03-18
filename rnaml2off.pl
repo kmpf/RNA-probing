@@ -400,10 +400,11 @@ sub insertBrackets{
                 $logger->info("Detected pseudoknot.");
                 $bracket_type = $i + 1;
             } else {
-               $logger->error($filename.": Encountered a problem with the pseudoknot detection! Bracket stack:");
-	       $logger->error( Dumper($bracket_stack) );
-	       $logger->error($filename . ": 5' bp of edge: " . $pos5P);
-	       $logger->error($filename . ": 3' bp of edge: " . $pos3P);
+            $logger->error($filename.": Encountered a problem with the pseudoknot detection!");
+#            $logger->error("Bracket stack:");
+#   	     $logger->error( Dumper($bracket_stack) );
+            $logger->error($filename . ": 5' bp of edge: " . $pos5P);
+            $logger->error($filename . ": 3' bp of edge: " . $pos3P);
             }
         }
         if ( $bracket_type > 3 ){
