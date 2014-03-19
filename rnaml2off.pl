@@ -75,14 +75,14 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 ## Lookup @files and @directories for rna1.xml files and insert the found in @rnaml_files
 ##  - find all rna1.xml files in the @directories given and add them to @files
 if ( scalar(@directories ) != 0 ){
-    my @checked_directories = [];
+    my @checked_directories;
     foreach (@directories) {
-	if ( -d $_ ) {
-	    $logger->info("$_ is a directory");
-	    push( @checked_directories, $_ );
-	} else {
-	    $logger->info("$_ isn't a directory");
-	}
+        if ( -d $_ ) {
+            $logger->info("$_ is a directory");
+            push( @checked_directories, $_ );
+        } else {
+            $logger->info("$_ isn't a directory");
+        }
     }
     $logger->error("No valid directory given.") && exit 0 
 	if ( scalar(@checked_directories) == 0 && scalar(@files) == 0 );
@@ -292,6 +292,7 @@ sub checkFiles {
 ##              
 ##  Invocation - \&wanted
 ##      - Subroutine used by File::Find
+##      - Superugly this usage
 ##
 ###############################################################################
 
