@@ -206,11 +206,16 @@ foreach my $rnaml_file ( @{$rnaml_files} ){
                 $bp{$id} = \@bpLW;
             }
             my @bpStart5p = sort keyCmp keys(%bp);
+            my @old_bpLW = undef;
             foreach my $key (@bpStart5p){
                 my @bpLW = @{ $bp{$key} };
-                ## insert opening and closing bracket for every standard Watson-Crick base pair
-                @dotBracket = &insertBrackets($bpLW[0], $bpLW[1], $bpLW[3], $bpLW[4], \@dotBracket, \@bracket_stack, $filename, $sequence);
+                @old_bpLW = @bpLW unless ( @old_bpLW );
+                ## insert opening and closing bracket for every standard 
+                ## Watson-Crick base pair
+                @dotBracket = &insertBrackets(\@bpLW, \@old_bpLW, \@dotBracket, \@bracket_stack, $filename, $sequence );
                 @colSize = &colSizeUpdate($bpLW[0], $bpLW[1], $bpLW[2], \@colSize);
+                @old_bpLW = @bpLW;
+                
             }
             ## $dbString - is the output string of the Dot-Bracket notation
             my $dbLine = join("", @dotBracket);
@@ -219,7 +224,7 @@ foreach my $rnaml_file ( @{$rnaml_files} ){
             
             ## $colSizeLine - assemble the line that holds the column sizes
             if ( scalar(@colSize) > 0 ) {
-                my $colSizeLine = "# ". length($notation) .";".join(";", @colSize) ;
+                my $colSizeLine = "# ". length($notation) .";".join(";", @colSize);
                 print $off_fh $colSizeLine."\n" ;
                 $logger->debug($colSizeLine);
             }
@@ -368,14 +373,17 @@ sub clearHash{
 ###############################################################
 
 sub insertBrackets{
-    my $pos5P = $_[0];
-    my $pos3P = $_[1];
-    my $edge5P = $_[2];
-    my $edge3P = $_[3];
-    my @dotBracket = @{$_[4]};
-    my $bracket_stack = $_[5];
-    my $filename = $_[6];
-    my @sequence = split("", $_[7]);
+    my ($pos5P, $pos3P, $lw_not, $edge5P, $edge3P) = @{$_[0]};
+#    my $pos3P = $_[1];
+#    my $edge5P = $_[2];
+#    my $edge3P = $_[3];
+    my ($old_pos5P, $old_pos3P, $old_lw_not, $old_edge5P, $old_edge3P) = @{$_[1]};
+    my @dotBracket = @{$_[2]};
+    my $dbn = join("", @dotBracket);
+    my $bracket_stack = $_[3];
+    my $filename = $_[4];
+    my @sequence = split("", $_[5]);
+
     my $bracket_type = 0;
     my %opening_brackets = ( 0 => '(', 1 => '[', 2 => '{', 3 => '<' );
     my %closing_brackets = ( 0 => ')', 1 => ']', 2 => '}', 3 => '>' );
@@ -395,17 +403,19 @@ sub insertBrackets{
                 last;
             } elsif ( $pos5P < ${$bracket_stack}[$i] && $pos3P > ${$bracket_stack}[$i] && $i + 1 == scalar(@{$bracket_stack}) ) {
                 push(@{$bracket_stack}, $pos3P);
+                $logger->info("Detected pseudoknot.");
                 $bracket_type = $i + 1;
                 last;
             } elsif ($pos5P < ${$bracket_stack}[$i] && $pos3P > ${$bracket_stack}[$i]) {
                 $logger->info("Detected pseudoknot.");
                 $bracket_type = $i + 1;
             } else {
-            $logger->error($filename.": Encountered a problem with the pseudoknot detection!");
-#            $logger->error("Bracket stack:");
-#   	     $logger->error( Dumper($bracket_stack) );
-            $logger->error($filename . ": 5' bp of edge: " . $pos5P);
-            $logger->error($filename . ": 3' bp of edge: " . $pos3P);
+                $logger->error($filename.": Encountered a problem with the ".
+                               "pseudoknot detection!");
+                $logger->error("$filename : edge $sequence[$pos5P-1]".
+                               "$pos5P-$sequence[$pos3P-1]$pos3P probably ".
+                               "collides with edge $sequence[$old_pos5P-1]".
+                               "$old_pos5P-$sequence[$old_pos3P-1]$old_pos3P");
             }
         }
         if ( $bracket_type > 3 ){
@@ -415,8 +425,8 @@ sub insertBrackets{
             $dotBracket[$pos3P-1] = $closing_brackets{$bracket_type};
         }
     }
-    my $s = join("", @dotBracket);
-    $logger->debug($s);
+    $dbn = join("", @dotBracket);
+    $logger->debug($dbn);
     return @dotBracket;
 };
 
