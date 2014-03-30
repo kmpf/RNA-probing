@@ -32,71 +32,24 @@ use List::Util qw(first max maxstr min minstr reduce shuffle sum);
 use Log::Log4perl qw(get_logger :levels);
 use Math::BigFloat;
 use Pod::Usage;
-#use RDF::Trine::Parser;
-#use RDF::Helper;
-#use Path::Class;
-my $module_dir = dirname(__FILE__);
-$module_dir =~ s/scripts$/RNAprobing/g;
-push(@INC, $module_dir); 
-require RNAprobing::RDATFile;
-require RNAprobing::OFFFile;
-#require RNAprobing::BLASTresult;
-require RNAprobing::RNAupFile;
 
+my $dbn = "(((.[.{.<..)))]}>";
+my @dbnArr = split("", $dbn);
 
-my %STANDARD = (
-    POWER => Math::BigFloat->new(10),  # Watt used for gel run
-    TIME => Math::BigFloat->new(60),   # duration of gel run
-    LDNA => Math::BigFloat->new(10000), # longest separable DNA fargment in bp
-    LDIST => Math::BigFloat->new(10),  # traveled distance of LDNA fragment in mm
-    SDNA => Math::BigFloat->new(1000),  # smallest separable DNA fragment in bp
-    SDIST => Math::BigFloat->new(50) );   # traveled distance of SDNA fragment in mm
+my %opening_brackets = ( 0 => '(', 1 => '[', 2 => '{', 3 => '<' );
+my %closing_brackets = ( 0 => ')', 1 => ']', 2 => '}', 3 => '>' );
 
-my $wanderstrecke = Math::BigFloat->bzero();
-my $length = Math::BigFloat->new(4000);
-my $power = Math::BigFloat->new('10');
-my $time = Math::BigFloat->new('40');
-my $SLOPE = '100'; # 
-
-&calculate_wanderlust(\%STANDARD, 4000);
-
-my $q = Image::Magick->new;
-$q->Set(size=>'100x100', 'pixel[50,50]'=>'255,0,0');
-$q->ReadImage('xc:white');
-
-my $colour = 155;
-my $gel = Image::Magick->new;
-$gel->Set(size => '1000x1000' );
-$gel->ReadImage('canvas:black');
-$gel->Draw(primitive => "line", points => "100,500 200,600", stroke => "rgb($colour, $colour, $colour)", strokewidth => '10');
-$gel->Draw(primitive => "line", points => "100,600 200,500", stroke => "red", strokewidth => '10');
-$gel->Write('png:out.png');
-
-
-
-
-sub calculate_wanderlust{
-    my ($standard, $frag_length) = @_;
-    my $fl = Math::BigFloat->new($frag_length);
-    my $test = Math::BigFloat->new($frag_length);
-    print $test."\n";
-    $test->blog(10);
-    print $test."\n";
-
-    my $y = $fl->blog(10);
-    my $y1 = $standard->{LDNA}->blog(10);
-    my $x1 = $standard->{LDIST};
-    my $y2 = $standard->{SDNA}->blog(10);
-    my $x2 = $standard->{SDIST};
-    my $slope =  ($y2 - $y1) / ( $x2 - $x1 );
-    print '$slope: '.$slope.'=('.$y2.' - '.$y1.') / ('.$x2.' - '.$x1.")\n";
-    my $x = (($y - $y1) + ($slope * $x1)) / $slope;
-    $x->precision(-2);
-    print '$x: '.$x.'=(('.$y.' - '.$y1.') + ('.$slope.' * '.$x1.')) / '.$slope."\n";
-    print $slope.' = '. ($y - $y1) / ($x - $x1)."\n";
+my $i = 3;
+my $incorrect_brackets = "";
+foreach my $key (keys(%opening_brackets)){
+    $incorrect_brackets .= '\\'.$opening_brackets{$key} unless ( $key == $i );
 }
-
-
-# 
-#`blat database.fa query.fa -q=rna -out=blast8 out.psl`;
-#system("blat", "-q=rna", "-minIdentity=98", "-out=blast8", "database.fa", "query.fa", "out.blast_out");
+my $re_open_bracket = '\\'.$opening_brackets{$i}.'['
+    .$incorrect_brackets.'\.\)\]\}\>]*$';
+print("$re_open_bracket\n");
+$dbn =~ /(?=$re_open_bracket)/g;
+print("Last opening bracket: $opening_brackets{$i} at position ". ($-[0]+1)."\n");
+my $re_closing_bracket = '\\'.$closing_brackets{$i}.'.*$';
+print("$re_closing_bracket\n");
+$dbn =~ /(?=$re_closing_bracket)/;
+print("Last closing bracket: $closing_brackets{$i} at position ". ($-[0]+1) ."\n");
