@@ -244,7 +244,7 @@ foreach my $index ( @{$rdat_object->data()->indices()} ) {
 }
 
 for (my $i = 0; $i <= ($seq_endpos - $seq_startpos);  $i++ ) {
-    # fill hash with keys eqaul sequence position in OFF file and
+    # fill hash with keys equal to sequence position in OFF file and
     # related reactivity from RDAT file
     $logger->info("$i. OFF: ".$off_object->sequence_one_indexed_map()->{$subject_start_off + $i}." ".($subject_start_off + $i) );
     $logger->info("$i. RDAT: ".$rdat_object->offset_sequence_map()->{$seq_startpos + $i}." ".($seq_startpos + $i) );
@@ -257,7 +257,7 @@ for (my $i = 0; $i <= ($seq_endpos - $seq_startpos);  $i++ ) {
     }
     foreach my $index ( @{$rdat_object->data()->indices()} ) {
         $pos_reac{$index}{$subject_start_off + $i} = 
-            $rdat_object->seqpos_scaled_reactivity_map($index)->{$seq_startpos + $i};
+            $rdat_object->seqpos_non_negative_reactivity_map($index)->{$seq_startpos + $i};
     }
 }
 ###############################################################################
