@@ -52,7 +52,6 @@ GetOptions(
     "man|m" => \$man,
     "verbose|v+" => \$verbose);
 
-print $rdat;
 pod2usage(-verbose => 1) && exit if ( $help );
 pod2usage(-verbose => 2) && exit if ( $man );
 pod2usage({-verbose => 1, -message => "Use this script like this:\n"}) &&
@@ -83,25 +82,6 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 
 require RNAprobing::RDATFile;
 require RNAprobing::BLASTresult;
-
-## Lookup @files and @directories for rna1.xml files and insert the found in @rnamlFiles
-##  - find all rna1.xml files in the @directories given and add them to @files
-#if ( scalar(@directories ) != 0 ){
-#    my @checked_directories = ();
-#    foreach (@directories) {
-#	if ( -d $_ ) {
-#	    $logger->info("$_ is a directory");
-#	    push( @checked_directories, $_ );
-#	} else {
-#	    $logger->info("$_ isn't a directory");
-#	}
-#    }
-#    $logger->error("No valid directory given.") && exit 0 
-#	if ( scalar(@checked_directories) == 0 && scalar(@files) == 0 );
-#    $logger->info("Looking for rdat files in directories:\n".
-#		  join("\n", @checked_directories));
-#   find(\&wanted, @checked_directories);
-#}
 
 ##  - check found files and add them to $rdat_files (array reference) if they passed the checks
 my $rdat_files = &checkFiles([$rdat]);
@@ -253,7 +233,7 @@ __END__
 
 =head1 NAME
 
-rdat2fasta.pl - Creating .fasta files fom .rdat files
+rdat2csv.pl - Creating .csv files fom .rdat files
 
 =head1 SYNOPSIS
 
