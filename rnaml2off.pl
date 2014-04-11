@@ -30,6 +30,8 @@ use File::Spec qw(rel2abs);
 use Log::Log4perl qw(get_logger :levels);
 use Pod::Usage;
 use Path::Class;
+my $module_dir = dirname(__FILE__);
+push(@INC, $module_dir); 
 
 ## Configure Getopt::Long ##
 Getopt::Long::Configure ("bundling");
@@ -476,8 +478,8 @@ sub keyCmp{
 sub LWnotation{
     my $pos3p = $_->{'base-id-3p'}[0]->{'base-id'}[0]->{'position'}[0];
     my $pos5p = $_->{'base-id-5p'}[0]->{'base-id'}[0]->{'position'}[0];
-    my $edge3p = &ndb2lw($_->{'edge-3p'}[0]);
-    my $edge5p = &ndb2lw($_->{'edge-5p'}[0]);
+    my $edge3p = uc(&ndb2lw($_->{'edge-3p'}[0]));
+    my $edge5p = uc(&ndb2lw($_->{'edge-5p'}[0]));
     my @bpLW = ();
     $bpLW[0] = $pos5p;
     $bpLW[1] = $pos3p;
