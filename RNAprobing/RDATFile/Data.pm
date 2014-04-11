@@ -24,6 +24,7 @@ sub new {
     &non_negative_reactivity($self);
     &seqpos_reactivity_map($self);
     &seqpos_scaled_reactivity_map($self);
+    &seqpos_non_negative_reactivity_map($self);
     bless $self, $classname;
 
     $self->read_data($lines) if ( defined $lines );
@@ -48,6 +49,7 @@ sub read_data {
         if ($words[0] =~ /^REACTIVITY:(\d+)$/) {
             $self->reactivity( $1, [@split] );
             $self->scaled_reactivity($1, $self->reactivity($1) );
+            $self->non_negative_reactivity($1, $self->reactivity($1) );
         }
         if ($words[0] =~ /^REACTIVITY_ERROR:(\d+)$/) {
             $self->reactivity_error( $1, [@split] );
@@ -167,12 +169,7 @@ sub non_negative_reactivity {
     if ( defined $index ){
         $self->indices( $index );
         if ( @{$reactivity} ) {
-#            my $max_reac = max( @{$reactivity} );
-#            my $min_reac = 0;
-#            my $min_reac = min( @{$reactivity} );
-#            my $reactivity_span = $max_reac - $min_reac;
             my @scaled_reac = ();
-            # scale the entries in @{$aref}
             foreach my $reac_value ( @{$reactivity} ) {
                 if ( $reac_value < '0') {
                     push( @scaled_reac, '0' );
