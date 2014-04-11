@@ -40,7 +40,6 @@ push(@INC, $module_dir);
 require RNAprobing::RDATFile;
 require RNAprobing::OFFFile;
 require RNAprobing::BLASTresult;
-require RNAprobing::RNAupFile;
 
 ###############################################################################
 #
@@ -93,14 +92,23 @@ my $rdf = RDF::Helper->new(
         },
     ExpandQNames => 1);
 
-# HowTo parse a file into a model
 
+# HowTo parse a file into a model
 my $parser = RDF::Trine::Parser->new( 'rdfxml' );
 my $base_uri = 'http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#';
 $parser->parse_file_into_model( $base_uri, $rdf_file, $rdf->model() );
 
-# Write the reduced model to file
+# Remove all edges with property "hasReactivity"
 
+# initialize hasReactivity uri
+my $has_reactivity_uri = "bioinf:hasReactivity";
+# $x needs to be undef in order to be used in the remove_statements call
+my $x;
+my $removed_stmts_count = $rdf->remove_statements($x, $has_reactivity_uri, $x);
+$logger->info("Removed ". $removed_stmts_count . " statements with property".
+              " hasReactivity");
+
+# Write the reduced model to file
 my $reduced_rdf = $rdf_file;
 $reduced_rdf =~ s/\.rdf$/\.reduced\.rdf/g;
 open (my $rdf_fh, ">", $reduced_rdf)  or die("Can't open $reduced_rdf.");
