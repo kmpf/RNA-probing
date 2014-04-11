@@ -196,7 +196,9 @@ $conf_content .= "// reasoner\n".
     "// alg.nrOfThreads = 4\n".
     "alg.maxExecutionTimeInSeconds = 60\n".
     "alg.noisePercentage = 30\n\n".
+    "// Nr. of positives: ". scalar(@positive_list). "\n".
     "lp.positiveExamples = {".join(",", @positive_list)."}\n".
+    "// Nr. of negatives: ". scalar(@negative_list)."\n".
     "lp.negativeExamples = {".join(",", @negative_list)."}\n";
 
 $logger->debug($conf_content);
@@ -231,10 +233,22 @@ sub configureLogger{
     my $logger = get_logger($logger_name);
     $logger->info("Verbosity level: $verbose");
     SELECT:{
-	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
-	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
-	    if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
-	    else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
+	    if ($verbose == 0){
+            $logger->level($ERROR); 
+            $logger->debug("Log level is ERROR") ;  
+            last SELECT; }
+	    if ($verbose == 1){ 
+            $logger->level($WARN) ; 
+            $logger->debug("Log level is WARN") ; 
+            last SELECT; }
+	    if ($verbose == 2){ 
+            $logger->level($INFO) ; 
+            $logger->debug("Log level is INFO") ; 
+            last SELECT; }
+	    else { 
+            $logger->level($DEBUG); 
+            $logger->debug("Log level is DEBUG") ; 
+            last SELECT; }
     }
     return $logger;
 }
@@ -248,9 +262,7 @@ sub configureLogger{
 
 sub query_model {
     my ($sparql_query, $model) = @_;
-#    print Dumper($model);
-    my $logger = get_logger();
-#    &test($model);
+    my $logger = get_logger("RNAprobing");
     my $result_list = "";
 
     if ( $sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
