@@ -82,8 +82,9 @@ sub read_file {
     close($rdat_file);
     $self->data($lines);
     foreach my $index ( @{$self->data()->indices()} ){
-	$self->seqpos_reactivity_map( $index, $self->seqpos() );
-	$self->seqpos_scaled_reactivity_map( $index, $self->seqpos() );
+        $self->seqpos_reactivity_map( $index, $self->seqpos() );
+        $self->seqpos_scaled_reactivity_map( $index, $self->seqpos() );
+        $self->seqpos_non_negative_reactivity_map( $index, $self->seqpos() );
     }
 
     if ( $self->rdat_version() == 0.24 ) {
