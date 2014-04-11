@@ -111,7 +111,6 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     my $fasta_file_short = $fasta_file.".short";
     my $rdat_object = ();
     $rdat_object = RNAprobing::RDATFile->new($rdat_file);
-    $rdat_object->write_file($rdat_file.".test");
     # I want to sequences as output
     # 1. $sequence: the complete one for the BLAT mapping
     # 2. $short_seq: the short one only giving the subsequence for
@@ -121,23 +120,23 @@ foreach my $rdat_file ( @{ $rdat_files } ) {
     my $seqpos = $rdat_object->seqpos();
 
     foreach my $pos (@{$seqpos}) {
-	if (defined $rdat_object->offset_sequence_map()->{$pos}) {
-	    $short_sequence .= $rdat_object->offset_sequence_map()->{$pos};
-	}
+        if (defined $rdat_object->offset_sequence_map()->{$pos}) {
+            $short_sequence .= $rdat_object->offset_sequence_map()->{$pos};
+        }
     }
 
     if ($to_dna) {
         $sequence =~ s/($regex)/$replace{$1}/g;
         $short_sequence =~ s/($regex)/$replace{$1}/g;
         $fasta_file .= ".dna.fa";
-	$fasta_file_short .= ".dna.fa";
+        $fasta_file_short .= ".dna.fa";
     } else {
         $fasta_file .= ".fa";
-	$fasta_file_short .= ".fa";
+        $fasta_file_short .= ".fa";
     }
 
     my $fasta_id = $filename;
-    $fasta_id =~ s/\_.*$//g;
+#    $fasta_id =~ s/\_.*$//g;
     open(my $fasta_fh, ">", $fasta_file) or die("Can't open $fasta_file.");
     print $fasta_fh "> ".$fasta_id."\n";
     print $fasta_fh $sequence."\n";
@@ -245,7 +244,7 @@ __END__
 
 =head1 NAME
 
-rdat2fasta.pl - Creating .fasta files fom .rdat files
+rdat2fasta.pl - Creating .fa files fom .rdat files
 
 =head1 SYNOPSIS
 
@@ -254,6 +253,16 @@ rdat2fasta.pl -f=</path/to/file> -d=</path/to/rdat-directory/> -v -t
 =head1 DESCRIPTION
 
 B<rdat2fasta.pl> takes RDAT files as input or searches given directories for them and converts them to FASTA files. The FASTA files are created within the same directory as the original RDAT files.
+
+Two FASTA files will be created by this script:
+
+=item *.fa
+
+Contains complete RNA sequence from RDAT file.
+
+=item *.short.fa
+
+Contains RNA sequence which is covered by probing data.
 
 =head1 OPTIONS
 
