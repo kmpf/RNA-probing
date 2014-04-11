@@ -35,7 +35,6 @@ use RDF::Trine::Parser;
 use RDF::Helper;
 use Path::Class;
 my $module_dir = dirname(__FILE__);
-#$module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir); 
 
 ###############################################################################
@@ -249,11 +248,11 @@ for (my $i = 0; $i <= ($seq_endpos - $seq_startpos);  $i++ ) {
     $logger->info("$i. OFF: ".$off_object->sequence_one_indexed_map()->{$subject_start_off + $i}." ".($subject_start_off + $i) );
     $logger->info("$i. RDAT: ".$rdat_object->offset_sequence_map()->{$seq_startpos + $i}." ".($seq_startpos + $i) );
     if ( uc($off_object->sequence_one_indexed_map()->{$subject_start_off + $i}) eq
-        uc($rdat_object->offset_sequence_map()->{$seq_startpos + $i}) ) {
+         uc($rdat_object->offset_sequence_map()->{$seq_startpos + $i}) ) {
         $pos_seq{$subject_start_off + $i} = 
             $rdat_object->offset_sequence_map()->{$seq_startpos + $i};
     } else {
-    die("Sequence mapping went wrong.");
+        die("Sequence mapping went wrong.");
     }
     foreach my $index ( @{$rdat_object->data()->indices()} ) {
         $pos_reac{$index}{$subject_start_off + $i} = 
@@ -364,7 +363,7 @@ sub calculate_probability_from_rnaup_energies {
 sub generate_rdf_model {
     my ($pos_seq, $pos_reac, $seq_start, $seq_end, $off_object,
     $rdat_object, $owl_file) = @_;
-    my $logger = get_logger();
+    my $logger = get_logger("RNAprobing");
     my $rdat_name = fileparse($rdat_object->filename());
     $rdat_name =~ s/\.rdat$//g;
     $logger->debug($rdat_name);
@@ -553,7 +552,7 @@ sub generate_rdf_model {
                 }
             }
             else {
-                $logger->error("The edge description $edge[3] can not be parsed.");
+                $logger->error($off_name ."The edge description $edge[3] can not be parsed.");
             }
         }
 
@@ -567,7 +566,7 @@ sub generate_rdf_model {
        my $string = $rdf->serialize( format => 'rdfxml');
        # my $string = $rdf->serialize( format => 'turtle');
        # $logger->info("$string");
-       print $rdf_fh $string;
+       print($rdf_fh $string);
        close $rdf_fh;
        $logger->info("Wrote $rdf_filename");
 
@@ -659,8 +658,7 @@ sub create_querypos_reactivity {
 sub configureLogger{
     ## Configure the logger ##
     my $verbose = shift;
-    my $logger_name = shift;
-    my $logger = get_logger($logger_name);
+    my $logger = get_logger("RNAprobing");
     $logger->info("Verbosity level: $verbose");
     SELECT:{
         if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
