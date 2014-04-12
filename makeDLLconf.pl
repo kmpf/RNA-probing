@@ -81,7 +81,9 @@ if ( $help ) {
 my $log4perl_conf = file(dirname(__FILE__), "RNAprobing.log.conf");
 
 pod2usage(-verbose => 1) && exit if ( $help );
-pod2usage(-verbose => 1) && exit if ( ($rdf_file eq "") || ($pos eq "") );
+pod2usage(-verbose => 1) && exit if ( ($rdf_file eq "") ||
+                                      ($pos eq "") || 
+                                      ($neg eq "") );
 pod2usage(-verbose => 2) && exit if ( $man );
 
 
@@ -93,7 +95,12 @@ my $logger_name = "RNAprobing";
 my $logger = &configureLogger($verbose, $logger_name);
 $logger->info("++++ ".__FILE__." has been started. ++++");
 
-
+# check if mandatory input files exist
+$rdf_file = &checkFiles($rdf_file) if ( $rdf_file ne "" );
+$pos = &checkFiles($pos) if ( $pos ne "" );
+$neg = &checkFiles($neg) if ( $neg ne "" );
+# get absolute path to RDF file for use in conf file
+$rdf_file = File::Spec->rel2abs($rdf_file);
 
 # Configure RDF::Helper
 my $rdf = RDF::Helper->new (
@@ -112,22 +119,16 @@ my $base_uri = 'http://purl.org/rss/1.0/';
 my $parser = RDF::Trine::Parser->new( 'rdfxml' );
 $parser->parse_file_into_model( $base_uri, $rdf_file, $model );
 
+# Read SPARQL query defining negative list
 my $pos_sparql_query = "";
-my $neg_sparql_query = "";
-
 open( my $pos_sparql_fh, "<", $pos) or die "Couldn't open file $pos. Error: $!";
 while (<$pos_sparql_fh>) {
     $pos_sparql_query .= $_;
 }
 close $pos_sparql_fh;
 
-# &test($rdf);
-# my $positive_list = &query_model( $pos_sparql_query, $rdf );
-# my $negative_list= &query_model( $neg_sparql_query, $rdf );
+# Execute query and collect results in @positive_list
 my @positive_list = ();
-my @negative_list = ();
-
-
 if ( $pos_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
     # SPARQL SELECT Query
     my $query = RDF::Query->new( $pos_sparql_query );
@@ -144,12 +145,16 @@ if ( $pos_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
     }
 }
 
+# Read SPARQL query defining negative list
+my $neg_sparql_query = "";
 open( my $neg_sparql_fh, "<", $neg) or die "Couldn't open file $neg. Error: $!";
 while (<$neg_sparql_fh>) {
     $neg_sparql_query .= $_;
 }
 close $neg_sparql_fh;
 
+# Execute query and collect results in @negative_list
+my @negative_list = ();
 if ( $neg_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
     # SPARQL SELECT Query
     my $query = RDF::Query->new( $neg_sparql_query );
@@ -255,6 +260,29 @@ sub configureLogger{
 
 ###############################################################################
 ##
+## &checkFiles(@filesToBeChecked)
+## - Performs file checks and returns an array with all succesfully checked files
+## - @filesToBeChecked = array of files to be checked
+##
+###############################################################################
+
+sub checkFiles {
+    my $test_file = shift;
+    my $checked_file = "";
+    my $logger = get_logger();
+    # Check if files are readable
+    if ( -r $test_file){
+        $checked_file = $test_file;
+        $logger->info("$test_file is readable.");
+    } else {
+        $logger->error("$test_file is not readable.");
+        exit;
+    }
+    return $checked_file;
+}
+
+###############################################################################
+## !!! Does not work for unknown reasons
 ## &query_model($sparql_query, $model)
 ## - queries $model with $sparql_query
 ## 
