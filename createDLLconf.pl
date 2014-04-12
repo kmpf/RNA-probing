@@ -144,6 +144,9 @@ if ( $pos_sparql_query =~ /[Ss][Ee][Ll][Ee][Cc][Tt]\s/ ) {
         push(@positive_list, $pos_element);
       }
     }
+} else {
+    $logger->error("Could not use given SPARQL query.");
+    exit;
 }
 
 
