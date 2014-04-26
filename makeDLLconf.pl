@@ -99,8 +99,6 @@ $logger->info("++++ ".__FILE__." has been started. ++++");
 $rdf_file = &checkFiles($rdf_file) if ( $rdf_file ne "" );
 $pos = &checkFiles($pos) if ( $pos ne "" );
 $neg = &checkFiles($neg) if ( $neg ne "" );
-# get absolute path to RDF file for use in conf file
-$rdf_file = File::Spec->rel2abs($rdf_file);
 
 # Configure RDF::Helper
 my $rdf = RDF::Helper->new (
@@ -175,6 +173,13 @@ my $pos_query_name = fileparse( $pos );
 $pos_query_name =~ s/\.sparql$//g;
 my $conf_file = $rdf_file;
 $conf_file =~ s/\.rdf$/\.$pos_query_name\.conf/g;
+
+# Calculate relative path between rdf file and conf file to be
+# parse filename of conf file
+my ($conf_name, $conf_dir, $conf_suff) = fileparse($conf_file);
+my ($rdf_name, $rdf_dir, $rdf_suff) = fileparse($rdf_file);
+my $rel_path = File::Spec->abs2rel( $rdf_dir, $conf_dir );
+$rdf_file = File::Spec->catfile($rel_path, $rdf_name);
 
 my $conf_content = "";
 $conf_content .= "// knowledge sources\n".
