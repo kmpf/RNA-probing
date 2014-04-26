@@ -250,7 +250,7 @@ for (my $i = 0; $i <= ($seq_endpos - $seq_startpos);  $i++ ) {
     if ( uc($off_object->sequence_one_indexed_map()->{$subject_start_off + $i}) eq
          uc($rdat_object->offset_sequence_map()->{$seq_startpos + $i}) ) {
         $pos_seq{$subject_start_off + $i} = 
-            $rdat_object->offset_sequence_map()->{$seq_startpos + $i};
+            uc($rdat_object->offset_sequence_map()->{$seq_startpos + $i});
     } else {
         die("Sequence mapping went wrong.");
     }
@@ -508,8 +508,8 @@ sub generate_rdf_model {
                 my $orientation = $1;
                 my $five_prime_edge = $2;
                 my $three_prime_edge = $3;
-                &insert_edge( $rdf, $five_prime_nuc_uri, $five_prime_edge );
-                &insert_edge( $rdf, $three_prime_nuc_uri, $three_prime_edge);
+#                &insert_edge( $rdf, $five_prime_nuc_uri, $five_prime_edge );
+#                &insert_edge( $rdf, $three_prime_nuc_uri, $three_prime_edge);
 
                 # insert TertiaryInteraction
                 # if marked as tertiary interaction ...
@@ -519,8 +519,11 @@ sub generate_rdf_model {
                     $rdf->assert_resource($five_prime_nuc_uri
                       , $has_tertiary_interaction_with_uri
                       , $three_prime_nuc_uri );
+                    $rdf->assert_resource($three_prime_nuc_uri
+                      , $has_tertiary_interaction_with_uri
+                      , $five_prime_nuc_uri );
                 # ... otherwise its a Leontis-Westhof base pair ...
-                } elsif ($orientation eq 'c' || $orientation eq 't' ) {                 
+                } elsif ($orientation eq 'c' || $orientation eq 't' ) {
                     $logger->debug("$five_prime_edge $three_prime_edge");
                     if ( $five_prime_edge =~ /[WEHS]/ && 
                         $three_prime_edge =~ /[WEHS]/ ) {
@@ -537,7 +540,13 @@ sub generate_rdf_model {
                             $rdf->assert_literal($five_prime_nuc_uri.$five_prime_edge,
                                                  $glycosidic_bond_in_cis_uri,
                                                  $bool_true);
+                            $rdf->assert_literal($three_prime_nuc_uri.$three_prime_edge,
+                                                 $glycosidic_bond_in_cis_uri,
+                                                 $bool_true);
                         } elsif ($orientation eq "t" ){
+                            $rdf->assert_literal($five_prime_nuc_uri.$five_prime_edge,
+                                                 $glycosidic_bond_in_trans_uri,
+                                                 $bool_true);
                             $rdf->assert_literal($three_prime_nuc_uri.$three_prime_edge,
                                                  $glycosidic_bond_in_trans_uri,
                                                  $bool_true);
