@@ -46,7 +46,7 @@ my $replace = "";
 my $replace_by = "";
 my $template = "";
 my $find_pattern = '\.conf';
-my $verbose = 2;
+my $verbose = 0;
 GetOptions(
     "combine|c=s" => \@confs_to_combine,
     "delete|del=s" => \$delete,
@@ -127,17 +127,19 @@ if ( scalar(@confs_to_combine) != 0 && $template ne "" && $model ne "" ) {
             if ( $_ =~ m/^lp\.positiveExamples/ ){
                 $_ =~ s/^lp\.positiveExamples.*\{//g;
                 $_ =~ s/}.*//g;
-                push(@lp_pos, $_);
+                my @pos_from_conf = split(',', $_);
+                push(@lp_pos, @pos_from_conf);
             }
             if ( $_ =~ m/^lp\.negativeExamples/ ){
                 $_ =~ s/^lp\.negativeExamples.*\{//g;
                 $_ =~ s/}.*//g;
-                push(@lp_neg, $_);
+                my @neg_from_conf = split(',', $_);
+                push(@lp_neg, @neg_from_conf);
             }
         }
         close($conf_file);
     }
-    
+
 # ... combine them according to the template
     my $combined = $template;
     $combined =~ s/conf$/combined.conf/;
@@ -148,9 +150,13 @@ if ( scalar(@confs_to_combine) != 0 && $template ne "" && $model ne "" ) {
         if ( $_ =~ m/^ks\d*\.fileName/ ){
             $_ =~ m/(.*\")(.*)(\".*)/;
             print($combined_file $1."./".$model.$3."\n");
+        } elsif ( $_ =~ m{^// Nr\. of positives: \d*}){
+            print($combined_file "// Nr. of positives: ".scalar(@lp_pos)."\n");
         } elsif ($_ =~ m/^lp\.positiveExamples/){
             $line = join(",", @lp_pos);
             print($combined_file "lp.positiveExamples = {".$line."}\n");
+        } elsif ( $_ =~ m{^// Nr\. of negatives: \d*}){
+            print($combined_file "// Nr. of negatives: ".scalar(@lp_neg)."\n");
         } elsif ($_ =~ m/^lp\.negativeExamples/){
             $line = join(",", @lp_neg);
             print($combined_file "lp.negativeExamples = {". $line ."}\n");
