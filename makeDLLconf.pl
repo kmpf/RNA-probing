@@ -41,11 +41,6 @@ use Scalar::Util qw(blessed);
 my $module_dir = dirname(__FILE__);
 # $module_dir =~ s/scripts$/RNAprobing/g;
 push(@INC, $module_dir);
-require RNAprobing::RDATFile;
-require RNAprobing::OFFFile;
-require RNAprobing::BLASTresult;
-require RNAprobing::RNAupFile;
-
 
 my $rdf_file = "";
 my $pos = "";

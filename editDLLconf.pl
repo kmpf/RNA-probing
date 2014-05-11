@@ -260,10 +260,26 @@ sub configureLogger{
     my $logger_name = shift;
     my $logger = get_logger($logger_name);
     SELECT:{
-	    if ($verbose == 0){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
-	    if ($verbose == 1){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
-	    if ($verbose == 2){ $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
-	    else {$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
+	    if ($verbose == 0){ 
+            $logger->level($WARN) ; 
+            $logger->debug("Log level is WARN") ;
+            last SELECT;
+        }
+	    if ($verbose == 1){ 
+            $logger->level($INFO) ; 
+            $logger->debug("Log level is INFO") ;
+            last SELECT;
+        }
+	    if ($verbose == 2){ 
+            $logger->level($DEBUG); 
+            $logger->debug("Log level is DEBUG") ;
+            last SELECT;
+        }
+	    else {
+            $logger->level($ERROR);
+            $logger->debug("Log level is ERROR") ;
+            last SELECT;
+        }
     }
     return $logger;
 }
