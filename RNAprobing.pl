@@ -135,6 +135,7 @@ my @probing_profile = (0) x length($seq);
 my $length = length(join("", @probing_profile));
 my @structures = &stochastic_sampling($seq, $sample_size);
 my @structure_description = &db2sd(@structures);
+my %bp_per_structure = &create_bp_hash(\@structures);
 foreach (@structures){
     $logger->debug( "Structure: ".$_."\n");
 }
@@ -142,8 +143,8 @@ foreach (@structure_description){
     $logger->debug( "Structure description: ".$_."\n");
 }
 
-@probing_profile = &simulate_probing(\@structure_description, \@probing_profile, 
-                                     $seq, $chemical);
+@probing_profile = &simulate_probing(\@structures, \@structure_description, 
+                                     \@probing_profile, $seq, $chemical);
 
 my ($begin, $end);
 if (defined $seqpos_begin && defined $seqpos_end &&
@@ -154,7 +155,7 @@ if (defined $seqpos_begin && defined $seqpos_end &&
     $begin = abs(1 + $offset - $seqpos_begin);
     $end = abs(1 + $offset - $seqpos_end);
 } else {
-    $seqpos_end = 1+$offset;
+    $seqpos_begin = 1+$offset;
     $seqpos_end = length($seq)+$offset;
 }
 
@@ -259,100 +260,123 @@ sub stochastic_sampling {
 ################################################################################
 
 sub db2sd {
-
-my (@structures) = @_;
-my @structure_description = ();
-foreach (@structures) {
-
-    my @db = split('', $_);
-
-    my @dots = (-1);
-    my @opening_br = (-1);
-
-    # at first we expect every nucleotide to be unpaired "U"
-    my @struc_dec = ("U") x length($_);
-
-    # fill arrays with positions
-    for (my $i = 0; $i < scalar(@db); $i++) {
-        push(@dots, $i) if ( $db[$i] eq "." );
-        push(@opening_br, $i) if ( $db[$i] eq "(" );
-
-        # closing bracket found, so lets classify enclosed unpaired nucleotides
-        # if there are any
-        # if clause leads to errors, if @db contains substrings like "()"
-        if ( $db[$i] eq ")" && $dots[$#dots] > $opening_br[$#opening_br] ) {
-
-            # declare enclosing bracket positions
-            my $op_br_pos = pop(@opening_br);
-            my $cl_br_pos = $i;
-
-            # Declare paired nucleotides
-            $struc_dec[$op_br_pos] = "P";
-            $struc_dec[$cl_br_pos] = "P";
-
-
-            my @enclosed_dots = ();
-            # count the number of stems enclosed by the unpaired nucleotides
-            my $enclosed_stems = 0;
-
-            # collect all enclosed nucleotides in @enclosed_dots
-            while ( $dots[$#dots] > $op_br_pos ) {
-                push(@enclosed_dots, pop(@dots));
-                # stop if you reached the last enclosed nucleotide
-                last if ($dots[$#dots] < $op_br_pos);
-                # if found non-continous numbers we found an enclosed stem
-                if ( $dots[$#dots]+1 < $enclosed_dots[$#enclosed_dots]) {
-                    $enclosed_stems++;
+    my (@structures) = @_;
+    my @structure_description = ();
+    foreach (@structures) {
+        
+        my @db = split('', $_);
+        
+        my @dots = (-1);
+        my @opening_br = (-1);
+        
+        # at first we expect every nucleotide to be unpaired "U"
+        my @struc_dec = ("U") x length($_);
+        
+        # fill arrays with positions
+        for (my $i = 0; $i < scalar(@db); $i++) {
+            push(@dots, $i) if ( $db[$i] eq "." );
+            push(@opening_br, $i) if ( $db[$i] eq "(" );
+            
+            # closing bracket found, so lets classify enclosed unpaired nucleotides
+            # if there are any
+            # if clause leads to errors, if @db contains substrings like "()"
+            if ( $db[$i] eq ")" && $dots[$#dots] > $opening_br[$#opening_br] ) {
+                
+                # declare enclosing bracket positions
+                my $op_br_pos = pop(@opening_br);
+                my $cl_br_pos = $i;
+                
+                # Declare paired nucleotides
+                $struc_dec[$op_br_pos] = "P";
+                $struc_dec[$cl_br_pos] = "P";
+                
+                my @enclosed_dots = ();
+                # count the number of stems enclosed by the unpaired nucleotides
+                my $enclosed_stems = 0;
+                
+                # collect all enclosed nucleotides in @enclosed_dots
+                while ( $dots[$#dots] > $op_br_pos ) {
+                    push(@enclosed_dots, pop(@dots));
+                    # stop if the last enclosed nucleotide is reached
+                    last if ($dots[$#dots] < $op_br_pos);
+                    # if found non-continous numbers we found an enclosed stem
+                    if ( $dots[$#dots]+1 < $enclosed_dots[$#enclosed_dots]) {
+                        $enclosed_stems++;
+                    }
                 }
-            }
-
-            # Hairpin or bulge detected
-            if ( $enclosed_stems == 0 ) {
-                # Hairpin detected if the enclosed dots reach from opening to
-                # closing bracket
-                if ($op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] &&
-                    $cl_br_pos - 1 == $enclosed_dots[0] ) {            
-                    foreach (@enclosed_dots) { $struc_dec[$_] = "H" }
+                
+                # Hairpin or bulge detected
+                if ( $enclosed_stems == 0 ) {
+                    # Hairpin detected if the enclosed dots reach from opening to
+                    # closing bracket
+                    if ($op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] &&
+                        $cl_br_pos - 1 == $enclosed_dots[0] ) {            
+                        foreach (@enclosed_dots) { $struc_dec[$_] = "H" }
+                    }
+                    # bulge detected if the enclosed dots just touch one bracket
+                    elsif ( $op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] ||
+                            $cl_br_pos - 1 == $enclosed_dots[0] ) {
+                        foreach (@enclosed_dots) { $struc_dec[$_] = "B" }
+                    }
                 }
-                # bulge detected if the enclosed dots just touch one bracket
-                elsif ( $op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] ||
+                # Multi loop with two included stems or an interior loop detected
+                elsif ( $enclosed_stems == 1 ) {
+                    # Interior loop detected if the enclosed dots reach from opening
+                    # to closing bracket
+                    if ($op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] &&
                         $cl_br_pos - 1 == $enclosed_dots[0] ) {
-                    foreach (@enclosed_dots) { $struc_dec[$_] = "B" }
+                        foreach (@enclosed_dots) { $struc_dec[$_] = "I" }
+                    }
+                    # Multi loop with two stems detected if the enclosed dots just
+                    # touch one bracket
+                    elsif ( $op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] ||
+                            $cl_br_pos - 1 == $enclosed_dots[0] ) {
+                        foreach (@enclosed_dots) { $struc_dec[$_] = "M" }
+                    }
                 }
-            }
-            # Multi loop with two included stems or an interior loop detected
-            elsif ( $enclosed_stems == 1 ) {
-                # Interior loop detected if the enclosed dots reach from opening
-                # to closing bracket
-                if ($op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] &&
-                    $cl_br_pos - 1 == $enclosed_dots[0] ) {
-                    foreach (@enclosed_dots) { $struc_dec[$_] = "I" }
-                }
-                # Multi loop with two stems detected if the enclosed dots just
-                # touch one bracket
-                elsif ( $op_br_pos + 1 == $enclosed_dots[$#enclosed_dots] ||
-                        $cl_br_pos - 1 == $enclosed_dots[0] ) {
+                # Multi loop detected if more than one stem is enclosed
+                elsif( $enclosed_stems > 1 ) {
                     foreach (@enclosed_dots) { $struc_dec[$_] = "M" }
                 }
             }
-            # Multi loop detected if more than one stem is enclosed
-            elsif( $enclosed_stems > 1 ) {
-                    foreach (@enclosed_dots) { $struc_dec[$_] = "M" }
+            # No enclosed unpaired nucleotides so lets declare the base pair
+            elsif ( $db[$i] eq ")" ) {
+                $struc_dec[$i] = "P";
+                my $rel_open_br = pop(@opening_br);
+                $struc_dec[$rel_open_br] = "P";
             }
         }
-        # No enclosed unpaired nucleotides so lets declare the base pair
-        elsif ( $db[$i] eq ")" ) {
-            $struc_dec[$i] = "P";
-            my $rel_open_br = pop(@opening_br);
-            $struc_dec[$rel_open_br] = "P";
-        }
+        my $str_desc = join("",@struc_dec);
+        push(@structure_description, join("",@struc_dec));
     }
-    my $str_desc = join("",@struc_dec);
-    push(@structure_description, join("",@struc_dec));
+    return @structure_description;
 }
-return @structure_description;
 
+sub create_bp_hash {
+    my ($structures) = @_;
+    my @base_base_per_structure = ();
+    foreach my $structure (@{$structures}) {
+        my %base_base_pairings = ();
+        my @db = split('', $structure);
+        my @dots = (-1);
+        my @opening_br = (-1);
+        my @closing_br = (-1);
+        # fill arrays with positions
+        for (my $i = 0; $i < scalar(@db); $i++) {
+            push(@dots, $i) if ( $db[$i] eq "." );
+            push(@opening_br, $i) if ( $db[$i] eq "(" );
+            if ( $db[$i] eq ")" ){
+                my $opening_bracket = pop(@opening_br);
+                my $closing_bracket = $i;
+                $base_base_pairings{$closing_bracket} = $opening_bracket;
+                $base_base_pairings{$opening_bracket} = $closing_bracket;
+            }
+        }
+        push(@base_base_per_structure, %base_base_pairings);
+    }
+    return @base_base_per_structure;
 }
+
 
 ################################################################################
 #
@@ -361,7 +385,9 @@ return @structure_description;
 ################################################################################
 
 sub simulate_probing {
-    my ($structure_description, $probing_profile, $seq, $chemical) = @_;
+    my ($bp_per_structure, $structure_description, 
+        $probing_profile, $seq, $chemical) = 
+        @_;
 
     for ( my $i = 0; $i < scalar(@{$chemical->probe_reac()}); $i++ ) {
         my $prob_reac = ${$chemical->probe_reac()}[$i];
