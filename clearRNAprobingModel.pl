@@ -118,16 +118,6 @@ if ( $rm_reactivities != 0 ){
         $rdf->remove_statements($x, $has_reactivity_uri, $x);
     $logger->info("Removed ". $removed_stmts_count . " statements with property".
                   " hasReactivity");
-
-# Write the reduced model to file
-    my $reduced_rdf = $rdf_file;
-    $reduced_rdf =~ s/\.rdf$/\.wo_hasReactivity\.rdf/g;
-    open (my $rdf_fh, ">", $reduced_rdf)  or die("Can't open $reduced_rdf.");
-    my $string = $rdf->serialize( format => 'rdfxml');
-# my $string = $rdf->serialize( format => 'turtle');
-# $logger->info("$string");
-    print $rdf_fh $string;
-    close $rdf_fh;
 }
 
 # Remove all edges with property "hasTertiaryInteractionWith"
@@ -140,16 +130,6 @@ if ( $rm_tertiary_interactions != 0 ){
         $rdf->remove_statements($x, $has_tertiary_interaction_with_uri, $x);
     $logger->info("Removed ". $removed_stmts_count . " statements with property".
                   " hasTertiaryInteractionWith");
-
-# Write the reduced model to file
-    my $reduced_rdf = $rdf_file;
-    $reduced_rdf =~ s/\.rdf$/\.wo_TertiaryInteractions\.rdf/g;
-    open (my $rdf_fh, ">", $reduced_rdf)  or die("Can't open $reduced_rdf.");
-    my $string = $rdf->serialize( format => 'rdfxml');
-# my $string = $rdf->serialize( format => 'turtle');
-# $logger->info("$string");
-    print $rdf_fh $string;
-    close $rdf_fh;
 }
 
 # Remove triple with subject or object "SugarEdge" or "HoogsteenEdge"
@@ -179,21 +159,54 @@ if ( $rm_lw_base_pairs != 0 ){
         $rdf->remove_statements($hoogsteen_edge_uri, $x, $x);
     $logger->info("Removed ". $removed_stmts_count . " statements with subject".
                   " HoogsteenEdge");
+    my $removed_stmts_count = 
+        $rdf->remove_statements($x, $x, $hoogsteen_edge_uri);
+    $logger->info("Removed ". $removed_stmts_count . " statements with object".
+                  " HoogsteenEdge");
     $removed_stmts_count = 
-        $rdf->remove_statements($x, $x, $sugar_edge_uri);
+        $rdf->remove_statements($sugar_edge_uri, $x, $x);
     $logger->info("Removed ". $removed_stmts_count . " statements with subject".
                   " SugarEdge");
-# Write the reduced model to file
+    $removed_stmts_count = 
+        $rdf->remove_statements($x, $x, $sugar_edge_uri);
+    $logger->info("Removed ". $removed_stmts_count . " statements with object".
+                  " SugarEdge");
+}
+
+if ($rm_lw_base_pairs != 0 && $rm_tertiary_interactions != 0 && 
+    $rm_reactivities != 0) {
+    # Write the reduced model to file
     my $reduced_rdf = $rdf_file;
     $reduced_rdf =~ s/\.rdf$/\.wo_LW_Base_Pairs\.rdf/g;
     open (my $rdf_fh, ">", $reduced_rdf)  or die("Can't open $reduced_rdf.");
     my $string = $rdf->serialize( format => 'rdfxml');
-# my $string = $rdf->serialize( format => 'turtle');
-# $logger->info("$string");
+    # my $string = $rdf->serialize( format => 'turtle');
+    # $logger->info("$string");
+    print $rdf_fh $string;
+    close $rdf_fh;
+
+} elsif ($rm_tertiary_interactions != 0 && $rm_reactivities != 0) {
+    # Write the reduced model to file
+    my $reduced_rdf = $rdf_file;
+    $reduced_rdf =~ s/\.rdf$/\.wo_TertiaryInteractions\.rdf/g;
+    open (my $rdf_fh, ">", $reduced_rdf)  or die("Can't open $reduced_rdf.");
+    my $string = $rdf->serialize( format => 'rdfxml');
+    # my $string = $rdf->serialize( format => 'turtle');
+    # $logger->info("$string");
+    print $rdf_fh $string;
+    close $rdf_fh;
+
+} elsif ($rm_reactivities != 0) {
+    # Write the reduced model to file
+    my $reduced_rdf = $rdf_file;
+    $reduced_rdf =~ s/\.rdf$/\.wo_hasReactivity\.rdf/g;
+    open (my $rdf_fh, ">", $reduced_rdf)  or die("Can't open $reduced_rdf.");
+    my $string = $rdf->serialize( format => 'rdfxml');
+    # my $string = $rdf->serialize( format => 'turtle');
+    # $logger->info("$string");
     print $rdf_fh $string;
     close $rdf_fh;
 }
-
 
 
 ###############################################################
