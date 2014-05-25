@@ -187,9 +187,11 @@ if ($owl_file ne ""){
 $conf_content .= "// reasoner\n".
     "reasoner.type = \"fast instance checker\"\n".
     "reasoner.sources = { ks1 }\n\n".
-    "// learning problem\n".
-    "lp.type = \"posNegStandard\"\n".
-    "lp.accuracyMethod = \"fmeasure\"\n\n".
+    "// run 10-fold cross validation\n".
+    "cli.type = \"org.dllearner.cli.CLI\"\n".
+    "cli.writeSpringConfiguration = false\n".
+    "cli.performCrossValidation = true\n".
+    "cli.nrOfFolds = 10\n".
     "// learning algorithm\n".
     "h.type =\"celoe_heuristic\"\n".
     "// h.expansionPenaltyFactor = 0.2\n".
@@ -197,10 +199,14 @@ $conf_content .= "// reasoner\n".
     "op.type = \"rho\"\n".
     "op.useCardinalityRestrictions = true\n".
     "op.useNegation = true\n\n".
+    "// algorithm parameters".
     "alg.type = \"celoe\"\n".
     "// alg.nrOfThreads = 4\n".
     "alg.maxExecutionTimeInSeconds = 60\n".
     "alg.noisePercentage = 30\n\n".
+    "// learning problem\n".
+    "lp.type = \"posNegStandard\"\n".
+    "lp.accuracyMethod = \"fmeasure\"\n\n".
     "// Nr. of positives: ". scalar(@positive_list). "\n".
     "lp.positiveExamples = {".join(",", @positive_list)."}\n".
     "// Nr. of negatives: ". scalar(@negative_list)."\n".
