@@ -224,10 +224,23 @@ sub configureLogger{
     my $logger = get_logger($logger_name);
     $logger->info("Verbosity level: $verbose");
     SELECT:{
-	    if ($verbose == 0){$logger->level($ERROR); $logger->debug("Log level is ERROR") ;  last SELECT; }
-	    if ($verbose == 1){ $logger->level($WARN) ; $logger->debug("Log level is WARN") ; last SELECT; }
-	    if ($verbose == 2){ $logger->level($INFO) ; $logger->debug("Log level is INFO") ; last SELECT; }
-	    else { $logger->level($DEBUG); $logger->debug("Log level is DEBUG") ;  last SELECT; }
+	    if ($verbose == 0){
+	           $logger->level($ERROR);
+	           $logger->debug("Log level is ERROR");
+	           last SELECT;
+        } elsif ($verbose == 1){ 
+               $logger->level($WARN);
+               $logger->debug("Log level is WARN");
+               last SELECT;
+	    } elsif ($verbose == 2){
+	           $logger->level($INFO);
+	           $logger->debug("Log level is INFO");
+	           last SELECT;}
+	    else {
+	           $logger->level($DEBUG);
+	           $logger->debug("Log level is DEBUG");
+	           last SELECT;
+	    }
     }
     return $logger;
 }
