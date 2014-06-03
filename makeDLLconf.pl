@@ -199,7 +199,7 @@ $conf_content .= "// reasoner\n".
     "op.type = \"rho\"\n".
     "op.useCardinalityRestrictions = true\n".
     "op.useNegation = true\n\n".
-    "// algorithm parameters".
+    "// algorithm parameters\n".
     "alg.type = \"celoe\"\n".
     "// alg.nrOfThreads = 4\n".
     "alg.maxExecutionTimeInSeconds = 60\n".
