@@ -196,17 +196,15 @@ __END__
 
 =head1 NAME
 
-createRNAprobingModel.pl - combines the structure information of an OFF file with the probing information of a RDAT file, given a mapping in BLAST format 
+createVARNAcolormap.pl - Creates a file which can be used as a color map for the VARNA RNA visulalization tool.
 
 =head1 SYNOPSIS
 
-createRNAprobingModel.pl [options] --off </path/to/off-file> --rdat </path/to/rdat-file>
+createVARNAcolormap.pl --off </path/to/off-file> --rdat </path/to/rdat-file>
 
 =head1 DESCRIPTION
 
-This script creates a RDF/XML model that is stored in an auto-generated file. The model is created from three mandatory input files, an RDAT file (probing information), an OFF file (structure information), and a file containing alignment information in BLAST format.
-
-The probing data is mapped onto the structure using the alignment information.
+Creates a file which can be used as a color map for the VARNA RNA visulalization tool.
 
 =head1 OPTIONS
 
@@ -222,15 +220,11 @@ Display whole man page
 
 =item B<--off>
 
-OFF file containing the sequence and structure information of a RNA (normally extracted from NDB RNAML files)
+DBN or OFF file containing the sequence and structure information of a RNA (normally extracted from NDB RNAML files); mandatory
 
 =item B<--rdat>
 
-RDAT file containing the probing information for a RNA (normally downloaded from the RMDB)
-
-=item B<--owl>
-
-OWL file which will be included into the RDF model. By default uses "RNAprobing.owl" which is contained in the RNAprobing repository.
+RDAT file containing the probing information for a RNA (normally downloaded from the RMDB); mandatory
 
 =item B<-v, --verbose>
 
