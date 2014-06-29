@@ -26,7 +26,13 @@ sub new {
     &bit_score($self);
 
     bless( $self, $classname );
-    $self->read_file($filename) if ($filename ne "");
+    if ( defined $filename ) {
+        if ( -e $filename ) {
+            $self->read_file($filename);
+        } else {
+            die "File ".$filename." does not exist.";
+        }
+    }
     return $self;
 }
 

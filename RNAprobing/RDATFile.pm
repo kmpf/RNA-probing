@@ -29,7 +29,13 @@ sub new {
     &data($self);
 
     bless $self, $classname;
-    $self->read_file($filename) if (defined $filename && -e $filename);
+    if ( defined $filename ) {
+        if ( -e $filename ) {
+            $self->read_file($filename);
+        } else {
+            die "File ".$filename." does not exist.";
+        }
+    }
     return $self;
 }
 ################################################################################

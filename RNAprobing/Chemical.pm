@@ -19,8 +19,13 @@ sub new {
 
     bless( $self, $classname );
 
-    $self->read_reactivity_file($filename) 
-        if (defined $filename && -e $filename );
+    if ( defined $filename ) {
+        if ( -e $filename ) {
+            $self->read_file($filename);
+        } else {
+            die "File ".$filename." does not exist.";
+        }
+    }
     return $self;
 }
 
@@ -38,7 +43,7 @@ sub new {
 ##
 ################################################################################
 
-sub read_reactivity_file {
+sub read_file {
     my ($self, $filename) = @_;
     $self->filename($filename);
     open ( my $reac_file , "<", $self->filename() ) or croak "Couldn't open file $self->filename(). Error: $!";
@@ -83,6 +88,7 @@ sub probe_name{
     my ($self, $probe_name) = @_;
     my $method_key = "PROBE_NAME";
     if ( defined $probe_name){
+        $probe_name =~ s/\s//g;
         $self->{$method_key} = $probe_name;
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = "";

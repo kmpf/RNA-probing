@@ -15,6 +15,13 @@ sub new {
     &rnaup_command($self);
 
     bless( $self, $classname );
+    if ( defined $filename ) {
+        if ( -e $filename ) {
+            $self->read_file($filename);
+        } else {
+            die "File ".$filename." does not exist.";
+        }
+    }
     return $self;
 }
 
