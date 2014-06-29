@@ -104,69 +104,68 @@ require RNAprobing::OFFFile;
 
 # Input needed is a FASTA file and a reactivity file
 my $fasta = RNAprobing::OFFFile->new($fasta_file);
-$logger->debug("Loaded Fasta file ".$fasta_file);
+$logger->debug("Loaded fasta file ".$fasta_file);
 my $chemical = RNAprobing::Chemical->new($chemical_file);
-my $sample_size; # number of stochastic sampled RNA structures to probe 
+$logger->debug("Loaded chemical file ".$chemical_file);
 
+## Sanity check of input parameter: --samples
+my $sample_size; # number of stochastically sampled RNA structures to probe 
 if (! defined($samples)) {
-    $logger->error("Sample size is undefined. Please provide positive integer ".
+    $logger->error("--samples not used. Please provide positive integer ".
                    "value via '--samples' option.");
     die;
-} elsif(Scalar::Util::looks_like_number($samples) && 
+} elsif (Scalar::Util::looks_like_number($samples) && 
         Scalar::Util::Numeric::isint($samples) ) {
-    if($samples <= 0) {
+    if ($samples <= 0) {
         $logger->error("Sample size is set to ".$samples.". Please provide ".
                        "positive integer value via '--samples' option.");
     die;
     } else {
         $sample_size = $samples;
-        $logger->debug("Sample size is set to ".$sample_size);
+        $logger->debug("--samples has value: ".$sample_size);
     }
 } else {
-    $logger->error("Sample size must be a positive integer.");
+    $logger->error("Sample size must be a positive integer. ".
+                   "Set via '--samples' option.");
     die;
 }
 
+## Sanity check of input parameters:
+
+# --offset
+if ( ! (Scalar::Util::Numeric::isint($offset)) ) {
+    $logger->error("Please provide valid integer value via '--offset' option'");
+    die;
+}
+# --begin
+if (defined $seqpos_begin && 
+    ! (Scalar::Util::Numeric::isint($seqpos_begin)) ) {
+    $logger->error("Please provide valid integer value via '--begin' option'");
+    die;    
+}
+# --end
+if (defined $seqpos_end && 
+    ! (Scalar::Util::Numeric::isint($seqpos_end)) ) {
+    $logger->error("Please provide integer value via '--end' option'");
+    die;    
+}
+
+# === Perform the probing ===
 
 my $seq = $fasta->sequence();
 $seq = uc($seq);
 $logger->debug($seq);
 my @probing_profile = (0) x length($seq);
-my $length = length(join("", @probing_profile));
+my $length = scalar(@probing_profile);
 my @structures = &stochastic_sampling($seq, $sample_size);
-my @structure_description = &db2sd(@structures);
+my @structure_description = &dot_bracket_to_structure_description(@structures);
 my %bp_per_structure = &create_bp_hash(\@structures);
-foreach (@structures){
-    $logger->debug( "Structure: ".$_."\n");
-}
-foreach (@structure_description){
-    $logger->debug( "Structure description: ".$_."\n");
-}
 
 @probing_profile = &simulate_probing(\@structures, \@structure_description, 
                                      \@probing_profile, $seq, $chemical);
 
-my ($begin, $end);
-if (defined $seqpos_begin && defined $seqpos_end &&
-    Scalar::Util::Numeric::isint($seqpos_begin) && 
-    Scalar::Util::Numeric::isint($seqpos_end) &&
-    $offset < $seqpos_begin && $seqpos_begin < $seqpos_end && 
-    $seqpos_end < length($seq)+$offset) {
-    $begin = abs(1 + $offset - $seqpos_begin);
-    $end = abs(1 + $offset - $seqpos_end);
-} else {
-    $seqpos_begin = 1+$offset;
-    $seqpos_end = length($seq)+$offset;
-}
 
-my @reactivity;
-if (defined $begin && defined $end){
-    @reactivity = @probing_profile[$begin..$end];
-} else {
-    @reactivity = @probing_profile;
-}
-
-# === Result output ===
+# === Log Result if needed ===
 # Should be logged instead of printed
 
 $logger->info("=== Results ===");
@@ -175,7 +174,38 @@ for (my $i = 0; $i < scalar(@structures); $i++) {
 }
 $logger->info(join(",", @probing_profile));
 
-# === Assemble a RDAT file ===
+# === Fiddle around with offset, seqpos_begin and seqpos_start ===
+my ($reactivity_begin, $reactivity_end);
+if (defined($seqpos_begin) && defined($seqpos_end) &&
+    # EITHER $seqpos_begin and $seqpos_end are set via options ...
+    $offset < $seqpos_begin && $seqpos_begin < $seqpos_end && 
+    $seqpos_end < length($seq)+$offset
+    # ... and they obey the rules ...
+    ) {
+    # ... new $reactivity_begin and $reactivity_end of REACTIVITY are calculated, ...
+    ## $offset minus $seqpos_* is fine, but for instance first nucleotide would be 1
+    ## so we need to substract 1 to get a fine array index
+    $reactivity_begin = abs($offset - $seqpos_begin ) - 1;
+    $reactivity_end = abs($offset - $seqpos_end) - 1;
+} else {
+    # ... OR $seqpos_begin and $seqpos_end are set here.
+    ## f**k you RDAT indices
+    ## sequence enumeration starts at OFFSET plus 1
+    ## and SEQPOS is 1-indexed  
+    $seqpos_begin = 1 + $offset;
+    ## length() starts counting at 1 so no need for extra addition
+    $seqpos_end = length($seq) + $offset;
+    ## $reactivity_begin and reactivity_end are array indices
+    ## so substract one from the $seqpos_* values
+    $reactivity_begin = $seqpos_begin - 1;
+    $reactivity_end = $seqpos_end - 1;
+}
+
+# Fill @reactivity with the correct values depending on $offset and $seqpos_begin
+# and $seqpos_end 
+my @reactivity = @probing_profile[$reactivity_begin..$reactivity_end];
+
+# === Assemble the RDAT file ===
 
 my $fasta_id = $fasta->fasta_id();
 $fasta_id =~ s/\.\w*$//g;
@@ -193,9 +223,12 @@ my ($struct, $mfe) = RNA::fold($seq);  # predict mfe structure of $seq
 $rdat_out->structure($struct);
 $rdat_out->offset($offset);
 $rdat_out->seqpos([$seqpos_begin..$seqpos_end]);
-$rdat_out->data()->reactivity(1, \@reactivity); # 1 <- index
-#$logger->debug(Dumper($rdat_out));
+$rdat_out->data()->reactivity(1, \@reactivity); # 1 is the index of the DATA line
 $rdat_out->write_file();
+print("$reactivity_begin-$reactivity_end\n");
+print("$seqpos_begin-$seqpos_end\n");
+print(scalar(@probing_profile)."\n");
+print(join(",", @reactivity)."\n");
 
 ################################################################################
 ################################################################################
@@ -272,7 +305,7 @@ sub stochastic_sampling {
 #
 ################################################################################
 
-sub db2sd {
+sub dot_bracket_to_structure_description {
     my (@structures) = @_;
     my @structure_description = ();
     foreach (@structures) {
@@ -409,6 +442,13 @@ sub simulate_probing {
         my $prob_cut = ${$chemical->probe_cut()}[$i];
 
         # create regex from probing sequence
+        
+        my $seq_regex = '';
+        my %letter2nucleotides = &single_letter_codes_for_nucleotides();
+        foreach my $nuc ( split('', $prob_seq) ) {
+            $seq_regex .= '['.$letter2nucleotides{$nuc}.']';
+        }
+
         $prob_seq =~ s/N/[ACGTU]/g;
 
         # create regex from probing structure
@@ -446,9 +486,30 @@ sub match_all_positions {
     while ($string =~ /(?=$regex)/g) {
         push(@ret,  $-[0] + $cut_pos);
     }
-    return @ret
+    return @ret;
 }
 
+
+sub single_letter_codes_for_nucleotides {
+    my %letter2nucleotides = ( A => 'A',
+                               C => 'C',
+                               G => 'G',
+                               T => 'T',
+                               U => 'U',
+                               M => 'AC',
+                               R => 'AG',
+                               W => 'AT',
+                               S => 'CG',
+                               Y => 'CT',
+                               K => 'GT',
+                               V => 'ACG',
+                               H => 'ACT',
+                               D => 'AGT',
+                               B => 'CGT',
+                               N => 'ACGT'
+        );
+    return %letter2nucleotides;
+}
 __END__
 
 =head1 NAME
