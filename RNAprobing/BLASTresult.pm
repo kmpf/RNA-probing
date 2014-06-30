@@ -26,13 +26,13 @@ sub new {
     &bit_score($self);
 
     bless( $self, $classname );
-    if ( defined $filename ) {
-        if ( -e $filename ) {
-            $self->read_file($filename);
-        } else {
-            die "File ".$filename." does not exist.";
-        }
-    }
+#    if ( defined $filename ) {
+#        if ( -e $filename ) {
+#            $self->read_file($filename);
+#        } else {
+#            die "File ".$filename." does not exist.";
+#        }
+#    }
     return $self;
 }
 
@@ -54,7 +54,7 @@ sub read_file {
     my @bit_scores = ();
 
     open( my $blast_result , "<", $self->filename($filename) ) or
-        die "Couldn't open file $self->filename(). Error: $!";
+        die("Couldn't open file ".$self->filename().". Error: $!");
     while (my $line = <$blast_result>) {
         chomp( $line );
         my $comment = '^#';

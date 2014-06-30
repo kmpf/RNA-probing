@@ -29,13 +29,13 @@ sub new {
     &data($self);
 
     bless $self, $classname;
-    if ( defined $filename ) {
-        if ( -e $filename ) {
-            $self->read_file($filename);
-        } else {
-            die "File ".$filename." does not exist.";
-        }
-    }
+#    if ( defined $filename ) {
+#        if ( -e $filename ) {
+#            $self->read_file($filename);
+#        } else {
+#            die "File ".$filename." does not exist.";
+#        }
+#    }
     return $self;
 }
 ################################################################################
@@ -57,7 +57,7 @@ sub read_file {
     $self->filename( $filename ) if ( defined $filename );
     
     open ( my $rdat_file , "<", $self->filename() ) or 
-	croak "Couldn't open file $self->filename(). Error: $!";
+	die("Couldn't open file ".$self->filename().". Error: $!");
 
     my $lines = "";
 

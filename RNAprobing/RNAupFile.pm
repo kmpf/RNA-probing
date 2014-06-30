@@ -15,13 +15,13 @@ sub new {
     &rnaup_command($self);
 
     bless( $self, $classname );
-    if ( defined $filename ) {
-        if ( -e $filename ) {
-            $self->read_file($filename);
-        } else {
-            die "File ".$filename." does not exist.";
-        }
-    }
+#    if ( defined $filename ) {
+#        if ( -e $filename ) {
+#            $self->read_file($filename);
+#        } else {
+#            die "File ".$filename." does not exist.";
+#        }
+#    }
     return $self;
 }
 
@@ -43,7 +43,8 @@ sub read_file {
     my $logger = get_logger();
     $self->filename( $filename );
  
-    open ( my $rnaup_file , "<", $self->filename() ) or die "Couldn't open file $self->filename(). Error: $!";;
+    open ( my $rnaup_file , "<", $self->filename() ) or 
+        die("Couldn't open file ".$self->filename().". Error: $!");
     my $comment = '^#|^\s*$';
     my $rnaup_cmd = '^# RNAup';
     my @columns = ();

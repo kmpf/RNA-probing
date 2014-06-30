@@ -23,13 +23,13 @@ sub new {
  
     bless( $self, $classname );
     
-    if ( defined $filename ) {
-        if ( -e $filename ) {
-            $self->read_file($filename);
-        } else {
-            die "File ".$filename." does not exist.";
-        }
-    }
+#    if ( defined $filename ) {
+#        if ( -e $filename ) {
+#            $self->read_file($filename);
+#        } else {
+#            die "File ".$filename." does not exist.";
+#        }
+#    }
     return $self;
 }
 
@@ -37,10 +37,8 @@ sub read_file {
     my ($self, $filename) = @_;
     my $logger = get_logger();
     my $line_number = 0;
-    die "No file given to RNAprobing::OFFFile::read_file!" 
-        unless (defined $filename );
-    open ( my $off_file , "<", $self->filename()) or 
-        die "Couldn't open file $self->filename(). Error: $!";
+     open ( my $off_file , "<", $self->filename()) or 
+        die("Couldn't open file ".$self->filename().". Error: $!");
     my @edges = ();
     my $nr_of_edges = "";
     while (my $line = <$off_file>) {
@@ -49,32 +47,33 @@ sub read_file {
         chomp( $line );
         if ($line_number == 1 && $line =~ /^>/) {
             $self->fasta_header( $line );
-            $logger->debug("[$filename] Fasta header: ".$self->fasta_header());
+            $logger->debug("[".$self->filename()."] Fasta header: "
+                           .$self->fasta_header());
             $line =~ s/>\s*(\S+).*/$1/g;
             $self->fasta_id( $line );
-            $logger->debug("[$filename] Fasta ID: ".$self->fasta_id() );
+            $logger->debug("[".$self->filename()."] Fasta ID: ".$self->fasta_id() );
             next;
         } elsif ( $line_number == 1 ) {
-            $logger->error("[$filename] First line isn't a fasta header."
+            $logger->error("[".$self->filename()."] First line isn't a fasta header."
                 ." It should start with '>'. Something is wrong.");
             exit 1;
         }
         if ($line_number == 2 && $line =~ /^[ACGUacgu]*$/) {
             $self->sequence( $line );
-            $logger->debug("[$filename] Sequence: ".$self->sequence() );
+            $logger->debug("[".$self->filename()."] Sequence: ".$self->sequence() );
             next;
         } elsif ( $line_number == 2 ) {
-            $logger->error("[$filename] Sequence seems not to be an RNA sequence."
+            $logger->error("[".$self->filename()."] Sequence seems not to be an RNA sequence."
                 ." ONLY those characters are allowed: A,C,G,U,a,c,g,u\n"
                 ."Sequence: ".$line);
             exit 1;
         }
         if ($line_number == 3 && $line =~ /^[\.\(\)\[\]\{\}<>]*$/) {
             $self->structure( $line );
-            $logger->debug("[$filename] Dot-bracket string: ".$self->structure() );
+            $logger->debug("[".$self->filename()."] Dot-bracket string: ".$self->structure() );
             next;
         } elsif ( $line_number == 3 ) {
-            $logger->error("[$filename] Dot-bracket string (third line of file ) contains other characters as one of those:\n"
+            $logger->error("[".$self->filename()."] Dot-bracket string (third line of file ) contains other characters as one of those:\n"
                 .".()[]{}<>");
             exit 1;
         }
@@ -84,7 +83,7 @@ sub read_file {
             $self->column_sizes(\@col_size);
             next;
         } elsif ($line_number == 4) {
-            $logger->error("[$filename] Line $line_number should start with '# ' followed "
+            $logger->error("[".$self->filename()."] Line $line_number should start with '# ' followed "
                 ."by the semicolon-separated values of the column sizes.");
         }
         if ( $line_number >= 5 && $line =~ /^#\s/ ) {
@@ -93,7 +92,7 @@ sub read_file {
 #            push(@{ $self->edges() }, [@split] );
             $nr_of_edges++;
         } elsif ( $line_number >= 5 && $line =~ /^[^#]/) {
-            $logger->error("[$filename] Line $line_number should start with '# '.");
+            $logger->error("[".$self->filename()."] Line $line_number should start with '# '.");
         }
         
     }

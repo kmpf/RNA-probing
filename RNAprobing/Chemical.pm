@@ -5,6 +5,10 @@ use warnings;
 use Carp;
 use Log::Log4perl qw(get_logger :levels);
 use Data::Dumper;
+use Scalar::Util::Numeric;
+
+print "Logging is not initialized!" unless (Log::Log4perl::initialized() );
+my $logger = get_logger();
 
 sub new {
     my ($classname, $filename) = @_;
@@ -19,13 +23,6 @@ sub new {
 
     bless( $self, $classname );
 
-    if ( defined $filename ) {
-        if ( -e $filename ) {
-            $self->read_file($filename);
-        } else {
-            die "File ".$filename." does not exist.";
-        }
-    }
     return $self;
 }
 
@@ -46,7 +43,8 @@ sub new {
 sub read_file {
     my ($self, $filename) = @_;
     $self->filename($filename);
-    open ( my $reac_file , "<", $self->filename() ) or croak "Couldn't open file $self->filename(). Error: $!";
+    open ( my $reac_file , "<", $self->filename() ) or 
+        die("Couldn't open file ".$self->filename().". Error: $!");
     my $line_nr = 0;
     while (my $line = <$reac_file>) {
         chomp( $line );
@@ -54,16 +52,47 @@ sub read_file {
         my $comment = '^#|^\s*$';
         next if ($line =~ /$comment/ );
         $line =~ s/#.*$//g; # remove in-line comments
-        $line =~ s/\s+$//;
+        $line =~ s/\s+$//; # remove trailing white spaces
+        my ($prob_reac, @prob_seq, @prob_str);
         $line_nr++;
-        $self->probe_name($line) if ($line_nr == 1 && 1 == ($line =~ s/^>//g) );
-        $self->probe_reac($line) if ($line_nr == 2 && $line <= 1); # muss die letzte Prüfung des Reaktivitätswerts sein? Fehlt da nicht eine Warnmeldung?
-        $self->probe_seq($line) if ($line_nr == 3); # könnte man noch auf zugelassene Nucleotide prüfen
-        $self->probe_str($line) if ($line_nr == 4); # könnte man noch auf zugelassene Strukturelemente prüfen
+        if ($line_nr == 1 && 1 == ($line =~ s/^>//g) ) {
+            $self->probe_name($line) ;
+        } elsif ($line_nr == 2) {
+            $prob_reac = $line;
+        } elsif ($line_nr == 3) {
+            @prob_seq = split("_", $line);
+        } elsif ($line_nr == 4) {
+            @prob_str = split("_", $line);
+        }
         # get modification position and reset counter for next block
-        if ($line_nr == 5) {$self->probe_cut($line); $line_nr = 1;}
-        
-        
+        if ($line_nr == 5) {
+            if (Scalar::Util::Numeric::isnum($prob_reac)) {
+                $self->probe_reac($prob_reac);
+            } else {
+                $logger->error("[".$self->filename()."] Given reactivity ".
+                               $prob_reac." is not a number.");
+                exit 1;
+            }
+            if (scalar(@prob_seq) == scalar(@prob_str) ) {
+                for (my $i = 0; $i < scalar(@prob_seq); $i++) {
+                    if ( length($prob_seq[$i]) != length($prob_str[$i]) ) {
+                        $logger->error("[".$self->filename()."] ".$prob_str[$i].
+                            " and ".$prob_seq[$i]." have unequal length.");
+                        exit 1;
+                    }
+                }
+                $self->probe_seq(\@prob_seq);
+                $self->probe_str(\@prob_str) ;
+            } else {
+                $logger->error("[".$self->filename()."] Sequence ".
+                               join("_", @prob_seq)." and structure ".join("_", @prob_str).
+                               " have unequal number of blocks.");
+                exit 1;                               
+            }
+            $self->probe_cut($line); 
+            $line_nr = 1;
+        }
+                
     }
 }
 
@@ -118,7 +147,7 @@ sub probe_seq{
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
-    return $self->{$method_key}; # returns an array reference
+    return $self->{$method_key}; # returns a refernce to an array of arrays
 }
 
 sub probe_str{
@@ -129,7 +158,7 @@ sub probe_str{
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
-    return $self->{$method_key}; # returns an array reference
+    return $self->{$method_key};  # returns a refernce to an array of arrays
 }
 
 sub probe_cut{
