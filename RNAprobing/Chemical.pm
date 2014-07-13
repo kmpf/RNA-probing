@@ -19,7 +19,8 @@ sub new {
     &probe_reac($self);
     &probe_seq($self);
     &probe_str($self);
-    &probe_cut($self);
+    &probe_mod($self);
+    &probe_mod_pos($self);
 
     bless( $self, $classname );
 
@@ -46,6 +47,7 @@ sub read_file {
     open ( my $reac_file , "<", $self->filename() ) or 
         die("Couldn't open file ".$self->filename().". Error: $!");
     my $line_nr = 0;
+    my ($prob_reac, @prob_seq, @prob_str, @prob_mod);
     while (my $line = <$reac_file>) {
         chomp( $line );
         # remove line comments and empty lines
@@ -53,19 +55,11 @@ sub read_file {
         next if ($line =~ /$comment/ );
         $line =~ s/#.*$//g; # remove in-line comments
         $line =~ s/\s+$//; # remove trailing white spaces
-        my ($prob_reac, @prob_seq, @prob_str);
         $line_nr++;
         if ($line_nr == 1 && 1 == ($line =~ s/^>//g) ) {
             $self->probe_name($line) ;
         } elsif ($line_nr == 2) {
             $prob_reac = $line;
-        } elsif ($line_nr == 3) {
-            @prob_seq = split("_", $line);
-        } elsif ($line_nr == 4) {
-            @prob_str = split("_", $line);
-        }
-        # get modification position and reset counter for next block
-        if ($line_nr == 5) {
             if (Scalar::Util::Numeric::isnum($prob_reac)) {
                 $self->probe_reac($prob_reac);
             } else {
@@ -73,26 +67,80 @@ sub read_file {
                                $prob_reac." is not a number.");
                 exit 1;
             }
-            if (scalar(@prob_seq) == scalar(@prob_str) ) {
-                for (my $i = 0; $i < scalar(@prob_seq); $i++) {
-                    if ( length($prob_seq[$i]) != length($prob_str[$i]) ) {
-                        $logger->error("[".$self->filename()."] ".$prob_str[$i].
-                            " and ".$prob_seq[$i]." have unequal length.");
+        } elsif ($line_nr == 3) {
+            # get sequence specific info for probe
+            if ($line =~ /^[ACGTUMRWSYKVHDBN_]*$/) {
+                @prob_seq = split("_", $line);
+            } else {
+                $logger->error("[".$self->filename()."] ".$line.
+                               " contains characters other than: ".
+                               "A, C, G, T, U, M, R, W, S, Y, K, V, ".
+                               "H, D, B, N, and _");
+                exit 1;
+            }
+        } elsif ($line_nr == 4) {
+            # get structure specific info for probe
+            if ($line =~ /^[BHIMPU\(\)_]*$/) {
+                @prob_str = split("_", $line);
+            } else {
+                $logger->error("[".$self->filename()."] ".$line.
+                               " contains characters other than: ".
+                               "B, H, I, M, P, U, (, ), and _");
+                exit 1;
+            }
+        } elsif ($line_nr == 5) {
+            # get modification postion info for probe
+            if ($line =~ /^[\.|_]*$/) {
+                @prob_mod = split("_", $line);
+            } else {
+                $logger->error("[".$self->filename()."] ".$line.
+                               " contains characters other than: ".
+                               "., |, and _");
+                exit 1;
+            }
+            # now that we have read all infos check their validity
+            # check that sequence, structure, and modification blocks defined in
+            # chemical file have same number of entries ... 
+            if ( grep { $_ == scalar(@prob_seq) } 
+                 (scalar(@prob_str), scalar(@prob_mod)) ){
+
+                my $entry_nr = scalar(@prob_seq);
+                # ... and each entry has to be as long as the according entry in 
+                # the other arrays ...
+                for ( my $i = 0; $i < $entry_nr; $i++) {
+                    # next if everything is fine
+                    if ( grep { $_ == length($prob_seq[$i])}
+                         (length($prob_str[$i]), length($prob_mod[$i])) ) {
+                        next;
+                    } else {
+                        # ... otherwise complain and die ...
+                        $logger->error("[".$self->filename()."]\n"
+                                       .$prob_str[$i]."\n"
+                                       .$prob_seq[$i]."\n"
+                                       .$prob_mod[$i]."\n"
+                                       ."must have equal length.");
                         exit 1;
                     }
                 }
-                $self->probe_seq(\@prob_seq);
-                $self->probe_str(\@prob_str) ;
             } else {
-                $logger->error("[".$self->filename()."] Sequence ".
-                               join("_", @prob_seq)." and structure ".join("_", @prob_str).
-                               " have unequal number of blocks.");
+                # ... or complain and die
+                $logger->error("[".$self->filename()."]\n"
+                               .join("_", @prob_seq)."\n"
+                               .join("_", @prob_str)."\n"
+                               .join("_", @prob_mod)."\n"
+                               ."Each line has to contain equal number of '_'.");
                 exit 1;                               
             }
-            $self->probe_cut($line); 
+            $self->probe_seq(@prob_seq);
+            $self->probe_str(@prob_str);
+            $self->probe_mod(@prob_mod);
+            $self->probe_mod_pos(@prob_mod);
+            # Reached end of a probing definition, so prepare for next one
             $line_nr = 1;
+            undef @prob_seq;
+            undef @prob_str;
+            undef @prob_mod;
         }
-                
     }
 }
 
@@ -139,37 +187,58 @@ sub probe_reac{
 }
 
 sub probe_seq{
-    my ($self, $probe_seq) = @_;
+    my ($self, @probe_seq) = @_;
     my $method_key = "PROBE_SEQENCE";
 
-    if ( defined $probe_seq){
-        push( @{$self->{$method_key}}, $probe_seq );
+    if ( @probe_seq){
+        push( @{$self->{$method_key}}, \@probe_seq );
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
-    return $self->{$method_key}; # returns a refernce to an array of arrays
+    return $self->{$method_key}; # returns a reference to an array of arrays
 }
 
 sub probe_str{
-    my ($self, $probe_str) = @_;
+    my ($self, @probe_str) = @_;
     my $method_key = "PROBE_SEC_STRUCTURE";
-    if ( defined $probe_str){
-        push( $self->{$method_key}, $probe_str );
+    if ( @probe_str){
+        push( $self->{$method_key}, \@probe_str );
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
-    return $self->{$method_key};  # returns a refernce to an array of arrays
+    return $self->{$method_key};  # returns a reference to an array of arrays
 }
 
-sub probe_cut{
-    my ($self, $probe_cut) = @_;
-    my $method_key = "PROBE_CUT";
-    if ( defined $probe_cut){
-        push( @{$self->{$method_key}}, $probe_cut );
+sub probe_mod{
+    my ($self, @probe_mod) = @_;
+    my $method_key = "PROBE_MOD";
+    if ( @probe_mod){
+        push( @{$self->{$method_key}}, \@probe_mod );
     } elsif ( !( defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }
-    return $self->{$method_key}; # returns an array reference
+    return $self->{$method_key}; # returns a reference to an array of arrays
+}
+
+# Creates an array of arrays containing the positions of the modification point
+# set in line #5 per block
+sub probe_mod_pos {
+    my ($self, @probe_mod) = @_;
+    my $method_key = "PROBE_MOD_POS";
+    if ( @probe_mod){
+        my @matches;
+        foreach ( @probe_mod ){
+            my @ret;
+            while ($_ =~ /(?=\|)/g) {
+                push(@ret,  $-[0]);
+            }
+            push(@matches, \@ret);
+        }
+        push( @{$self->{$method_key}}, \@matches );
+    } elsif ( !( defined $self->{$method_key}) ) {
+        $self->{$method_key} = [];
+    }
+    return $self->{$method_key}; # returns a reference to an array of arrays
 }
 
 1;
