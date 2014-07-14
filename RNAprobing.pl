@@ -498,7 +498,7 @@ sub simulate_probing {
             my @block_match;
             # find identical matches in @seq_matches and @str_matches
             for (my $j = 0; $j < scalar(@seq_matches); $j++ ) {
-                my @matching_positions;
+                my @matching_positions =();
                 my ($str_el, $seq_el) = (0, 0);
                 my $seq_block_matches = $seq_matches[$j];
                 my $str_block_matches = $str_matches[$j];
@@ -519,37 +519,74 @@ sub simulate_probing {
                     }
                 }
                 push(@block_match, \@matching_positions);
-                print("Matches: ".join(",", @matching_positions)."\n");
+#                print("Matches: ".join(",", @matching_positions)."\n");
             }
-            # check if found matches for each block are connected by base pairs
-            print( "Block connections:\n".Dumper(keys(%block_connect)) );
-            print("Nr. of matching blocks: ".scalar(@block_match)."\n");
 
-            # each defined block needs to match before anything can be added
-            # to the probing profile
+            # check if found matches for each block are connected by base pairs
+
             my %bp_per_structure = &create_bp_hash($structure);
-            my $shadow_profile = (0) x length(@{$probing_profile});
+
+            ## At first check if all requirements are fulfilled ...
+
+            # variables for later use
             my $matching_blocks = 0;
+            my @matching_positions;
+
+            # ... each block must have matched ...             
             for ( my $j = 0; $j < scalar(@block_match); $j++) {
-                $matching_blocks++ if (@{$block_match[$j]});                   
-                foreach my $offset ( @{$block_match[$j]} ) {
-                    
-                    if ( ! %block_connect ) {
-                        # no connecting base pairs defined;
-                        # so lets add something to the $probing_profile
-                        
+                # check if there has something been found for block $j
+                $matching_blocks++ if (@{$block_match[$j]});
+            }
+                # ... and only matches which obey the rules are passed on ...
+
+            if ( %block_connect ) {
+                foreach my $key ( keys(%block_connect) ){
+                    my @key_pos = split(",", $key);
+                    my @val_pos = split(",", $block_connect{$key});
+                    foreach my $key_offset ( @{$block_match[$key_pos[0]]} ){
+                        my $key_base_pos = $key_offset + $key_pos[1];
+                        foreach my $val_offset (@{$block_match[$val_pos[0]]}){
+                            my $val_base_pos = $val_offset + $val_pos[1];
+                            if ( $bp_per_structure{$key_base_pos} == 
+                                 $val_base_pos ) {
+                                # need to calculate the modification point
+                                foreach my $mod_pos (@{$prob_mod_pos->[$key_pos[0]]} ) {
+ #                                   print(Dumper($prob_mod_pos));
+#                                    print("Modification point: $mod_pos\n");
+                                    my $prob_pos = $key_offset + $mod_pos;
+#                                    print("Found a valid bp: $key_base_pos"
+#                                          ."/$val_base_pos\n");
+#                                    print("Probed position: $prob_pos\n");
+                                    push(@matching_positions, $prob_pos);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                for ( my $j = 0; $j < scalar(@block_match); $j++) {
+                    foreach my $offset ( @{$block_match[$j]} ) {
                         foreach my $mod_pos (@{$prob_mod_pos->[$j]}) {
                             my $prob_pos = $offset + $mod_pos;
-                            $shadow_profile->[$prob_pos] += $prob_reac;
-                            print( "Probing profile:\n".
-                                   join(",",@{$probing_profile})."\n" );
+                            push(@matching_positions, $prob_pos);
                         }
-                    } else {
-                        
                     }
                 }
             }
-        }        
+#            print(Dumper(\%block_connect));
+#            print("Found matches for "
+#                  .$matching_blocks."/".scalar(@{$prob_seq})
+#                  ." blocks\n");
+            
+            ## Finally modify the probing profile if all blocks matched
+            if ( $matching_blocks == scalar(@{$prob_seq}) ) {
+                foreach my $prob_pos (@matching_positions) {
+                    $probing_profile->[$prob_pos] += $prob_reac;
+                    $logger->info( "Probing profile:\n".
+                           join(",",@{$probing_profile})."\n" );
+                }
+            }
+        }
     }
     return @{$probing_profile};
 }
@@ -571,15 +608,15 @@ sub find_str_block_connect {
         my @str = split('', $prob_str->[$i]);
         for (my $j=0; $j < scalar(@str); $j++ ) {
             if ( $str[$j] eq '(' ) {
-                # create unique key for opening bracket
-                # position holds block and position within this block
-                # unique key is necessary for use within hash
+                # create unique key for opening bracket:
+                # * key = block,position
                 my $op_br_pos = join(",", $i, $j);
                 # save position on stack
                 push( @op_br,  $op_br_pos);
             }
             if ( $str[$j] eq ')' ) {
                 # create unique key for closing bracket
+                # * key = block,position
                 my $cl_br_pos = join( ",", $i, $j);
                 # get associated opening bracket
                 my $op_br_pos = pop( @op_br );
