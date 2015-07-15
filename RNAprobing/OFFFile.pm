@@ -35,6 +35,8 @@ sub new {
 
 sub read_file {
     my ($self, $filename) = @_;
+    $self->filename( $filename ) if ( defined $filename );
+
     my $logger = get_logger();
     my $line_number = 0;
      open ( my $off_file , "<", $self->filename()) or 

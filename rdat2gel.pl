@@ -347,8 +347,7 @@ sub make_gel {
         $imagename .=  $filename . "-";
         my $data = $rdat_object->data();
         $logger->info("Band: $well_nr");
-        # ... which might contain several probing tracks ...
-        # ... which end up as displayed bands
+        # ... which might contain several probing tracks
         foreach my $index ( @{$data->indices()} ) {
             my $pos_reac =  $data->seqpos_scaled_reactivity_map($index);
             $logger->info(Dumper($pos_reac));
@@ -420,9 +419,10 @@ sub make_gel {
 ## &calculate_fragment_migration($gel, $chamber, $frag_length, $logest_rna);
 ## - Performs file checks and returns an array with all succesfully checked files
 ## - $standard = Hash reference
-## - $frag_length = length of fragment for which migration distance is to be calculated
+## - $frag_length = length of fragment for which migration distance is to be
+##                  calculated
 ##
-#########################################################################################
+################################################################################
 
 
 sub calculate_fragment_migration{

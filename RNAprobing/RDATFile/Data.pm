@@ -92,12 +92,11 @@ sub serialize_data {
 sub indices {
     my ($self, $index) = @_;
     my $method_key = "INDICES";
-    
     # if the index is defined and not present in the index array
     # add it to the array and sort the array afterwards 
     if ( defined $index && !( $index ~~ @{$self->{$method_key}} ) ) {
-    push ( @{$self->{$method_key}}, $index);
-    @{$self->{$method_key}} = sort { $a <=> $b } @{$self->{$method_key}};
+        push ( @{$self->{$method_key}}, $index);
+        @{$self->{$method_key}} = sort { $a <=> $b } @{$self->{$method_key}};
     } elsif ( !(defined $self->{$method_key}) ) {
         $self->{$method_key} = [];
     }

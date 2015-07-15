@@ -89,11 +89,12 @@ require RNAprobing::OFFFile;
 ################################################################################
 
 # check if input files exist
-$off_file = &checkFiles($off_file) if ( $off_file ne "" );
-$rdat_file = &checkFiles($rdat_file) if ( $rdat_file ne "" );
+$rdat_file = &checkFiles($rdat_file);
+$off_file = &checkFiles($off_file);
 
 # creation of RDAT file object and information extraction
-my $rdat_object     = RNAprobing::RDATFile->new($rdat_file);
+my $rdat_object     = RNAprobing::RDATFile->new();
+$rdat_object->read_file($rdat_file);
 my $rdat_filename   = fileparse($rdat_object->filename());
 my $rdat_seq_startpos = $rdat_object->seq_startpos();
 #my $rdat_reactivity = $rdat_object->data()->reactivity();
@@ -102,7 +103,8 @@ my @rdat_seq        = split(//, $rdat_object->sequence());
 my @rdat_seqpos     = @{$rdat_object->seqpos()};
 
 # creation of OFF file object and information extraction
-my $off_object      = RNAprobing::OFFFile->new($off_file);
+my $off_object      = RNAprobing::OFFFile->new();
+$off_object->read_file($off_file);
 
 ###############################################################################
 #
@@ -128,13 +130,13 @@ if ($rdat_sequence =~ /$off_sequence/) {
 foreach my $rdat_index ( @{$rdat_object->data()->indices()} ) {
     my $color_map_filename = $rdat_filename."_".$rdat_index.".color_map";
     $color_map_filename =~ s/\.rdat//g;
+    $logger->info("Write Color Map to $color_map_filename.");
     open(my $color_map, ">", $color_map_filename) or die "Couldn't open file $color_map_filename. Error: $!";
     for (my $i = $start_position; $i <= $end_position; $i++){
-        my @sequence = split("", $rdat_sequence);
         print($color_map $rdat_object->data()->seqpos_reactivity_map($rdat_index)->{1+$rdat_offset+$i}."\n");
     }
 }
-exit(0);
+
 
 ###############################################################################
 ##              
@@ -178,18 +180,27 @@ sub configureLogger{
 ###############################################################################
 
 sub checkFiles {
-    my $test_file = shift;
-    my $checked_file = "";
-    my $logger = get_logger();
     # Check if files are readable
-    if ( -r $test_file){
-        $checked_file = $test_file;
-        $logger->info("$test_file is readable.");
+    my $testfile = shift;
+    my $checkedfile = ();
+    my $logger = get_logger("RNAprobing");
+
+    $logger->info("Perform file checks for file $testfile");
+    if ( -f $testfile){
+        $logger->info("$testfile is a plain file");
+        if ( -r $testfile) {
+            my $abs_path = File::Spec->rel2abs( $testfile );
+            $logger->info("$testfile can be accessed");
+            $checkedfile= $abs_path;
+            $logger->debug("Absolute path: $abs_path");
+        } else {
+            $logger->error("Can not access $testfile");
+        }
     } else {
-        $logger->error("$test_file is not readable.");
-        exit;
+        $logger->error("$testfile is not a plain file");
+        $logger->error("$testfile is a directory") if ( -d $testfile);
     }
-    return $checked_file;
+    return $checkedfile;
 }
 
 __END__
