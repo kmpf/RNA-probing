@@ -1,1 +1,264 @@
-../../Data/RNA-structure-probing/RMDB2NDB_mapping/RNA-Ontology/RNAprobing.owl
+<?xml version="1.0"?>
+
+
+<!DOCTYPE rdf:RDF [
+    <!ENTITY owl "http://www.w3.org/2002/07/owl#" >
+    <!ENTITY xsd "http://www.w3.org/2001/XMLSchema#" >
+    <!ENTITY rdfs "http://www.w3.org/2000/01/rdf-schema#" >
+    <!ENTITY rdf "http://www.w3.org/1999/02/22-rdf-syntax-ns#" >
+]>
+
+
+<rdf:RDF xmlns="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#"
+     xml:base="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:owl="http://www.w3.org/2002/07/owl#">
+    <owl:Ontology rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl"/>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Datatypes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Object Properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#hasEdge -->
+
+    <owl:ObjectProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#hasEdge">
+        <rdf:type rdf:resource="&owl;SymmetricProperty"/>
+        <rdfs:range rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#hasTertiaryInteractionWith -->
+
+    <owl:ObjectProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#hasTertiaryInteractionWith">
+        <rdf:type rdf:resource="&owl;SymmetricProperty"/>
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+        <rdfs:range rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#isFivePrimeOf -->
+
+    <owl:ObjectProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#isFivePrimeOf">
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+        <rdfs:range rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#isPairedWith -->
+
+    <owl:ObjectProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#isPairedWith">
+        <rdf:type rdf:resource="&owl;SymmetricProperty"/>
+        <rdfs:range rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#isThreePrimeOf -->
+
+    <owl:ObjectProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#isThreePrimeOf">
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+        <rdfs:range rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+    </owl:ObjectProperty>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Data properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#GlycosidicBondInCis -->
+
+    <owl:DatatypeProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#GlycosidicBondInCis">
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+        <rdfs:range rdf:resource="&xsd;boolean"/>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#GlycosidicBondInTrans -->
+
+    <owl:DatatypeProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#GlycosidicBondInTrans">
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+        <rdfs:range rdf:resource="&xsd;boolean"/>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#hasReactivity -->
+
+    <owl:DatatypeProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#hasReactivity">
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+        <rdfs:range rdf:resource="&xsd;decimal"/>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#isPaired -->
+
+    <owl:DatatypeProperty rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#isPaired">
+        <rdfs:domain rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+        <rdfs:range rdf:resource="&xsd;boolean"/>
+    </owl:DatatypeProperty>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Classes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Adenosine -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Adenosine">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Purine"/>
+    </owl:Class>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Cytidine -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Cytidine">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Pyrimidine"/>
+    </owl:Class>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Guanosine -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Guanosine">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Purine"/>
+    </owl:Class>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#HoogsteenEdge -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#HoogsteenEdge">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+    </owl:Class>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Purine -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Purine">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+    </owl:Class>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Pyrimidine -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Pyrimidine">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+    </owl:Class>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Ribonucleotide"/>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#SugarEdge -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#SugarEdge">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+    </owl:Class>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Uridine -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Uridine">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Pyrimidine"/>
+    </owl:Class>
+    
+
+
+    <!-- http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#WatsonCrickEdge -->
+
+    <owl:Class rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#WatsonCrickEdge">
+        <rdfs:subClassOf rdf:resource="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Edge"/>
+    </owl:Class>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // General axioms
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    <rdf:Description>
+        <rdf:type rdf:resource="&owl;AllDisjointClasses"/>
+        <owl:members rdf:parseType="Collection">
+            <rdf:Description rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Adenosine"/>
+            <rdf:Description rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Cytidine"/>
+            <rdf:Description rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Guanosine"/>
+            <rdf:Description rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#Uridine"/>
+        </owl:members>
+    </rdf:Description>
+    <rdf:Description>
+        <rdf:type rdf:resource="&owl;AllDisjointClasses"/>
+        <owl:members rdf:parseType="Collection">
+            <rdf:Description rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#HoogsteenEdge"/>
+            <rdf:Description rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#SugarEdge"/>
+            <rdf:Description rdf:about="http://www.bioinf.uni-leipzig.de/~kaempf/RNAprobing.owl#WatsonCrickEdge"/>
+        </owl:members>
+    </rdf:Description>
+</rdf:RDF>
+
+
+
+<!-- Generated by the OWL API (version 3.2.3.1824) http://owlapi.sourceforge.net -->
+
